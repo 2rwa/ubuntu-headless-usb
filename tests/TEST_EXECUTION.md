@@ -433,3 +433,16 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
   consumes the elapsed time; don't label a 40s deadline as a systemd failure.
 - Execute safety tests first; run exactly one opt-in cached minimal Ubuntu
   integration for BIOS DHCP/SSH then UEFI fallback/full verification.
+
+
+## 2026-11-22 — single cached integration for firstboot timings and SSH
+
+- The instrumentation-only code and bounded 55s firstboot wait passed the
+  no-image safety workflow [#45018412814](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/45018412814).
+- Build one cached minimal 24.04 image. Confirm the real shell/PAM transition,
+  SERIAL firstboot stage markers and timings, DHCP address, SSH authentication
+  identity (separate from remote service checks), root/runner SSH rejection,
+  and full UEFI onboarding when BIOS passes.
+- BIOS and UEFI retain the 180s total QEMU integration limit, including SSH.
+- If firstboot does not complete, identify which labelled systemctl stage
+  remained in progress rather than blindly increasing timeouts.
