@@ -134,3 +134,38 @@ Next expensive run should use the **CI-only minimal Ubuntu profile** with
 archive caching. Do not rerun the full development-package profile solely
 to troubleshoot VGA. BIOS and UEFI OS boot were already proven by #44969403610;
 real tty1/PAM login and SSH remain incomplete in the extended scenario.
+
+
+## Run #44976878592 — minimal Ubuntu / PAM / cache postmortem (2026-11-22)
+
+[Run log](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44976878592)
+
+- Static/safety and minimal-image build/inspection PASSED. Sparse 25-GiB
+  image occupied about 2.0 GiB on the hosted runner.
+- BIOS userspace and VGA screenshot PASSED: 1280x800, two colors. The saved
+  username-only screenshot visibly shows "usb-ci-01 login: developer" and
+  "Password:", confirming real tty1 username keyboard delivery.
+- The root watcher observed "USB_CI_NET_PAM_PASSWORD_DATE_UPDATED": the shadow
+  password-change day became nonzero. This supports a genuine forced-password
+  update, but does not establish a working login shell.
+- The host timed out waiting for "USB_CI_VGA_LOGIN_OK", before sending
+  "sudo usb-firstboot-complete". Network/SSH and UEFI were not tested.
+- Likely CI harness defect: the /etc/profile.d/usb-ci-vga-login.sh hook
+  attempts to write to /dev/ttyS0 as the unprivileged developer. The device
+  normally belongs to root:dialout (mode 0660); the account is in sudo but
+  not dialout. Confirm permissions with stat during next run. Do not relax
+  production device permissions. Instead, have the login shell create a
+  nonsecret marker readable by a root-owned CI watcher, which emits serial.
+- Confirmed diagnostic mismatch: the watcher writes prefix "USB_CI_NET_"
+  but the host greps "USB_CI_PAM_PASSWORD_DATE_UPDATED". Its resulting
+  "No PAM password-change evidence" message is misleading.
+- Cache RESTORE missed: "Cache not found for input keys:
+  noble-amd64-debs-v2-1-...-nofw". Cache SAVE failed: tar could not
+  read root-owned cache "partial" and "lock" entries (Permission denied).
+  Around 900 MiB of .deb data was present, but it was NOT saved.
+- Measured host RX: 917,771 to 2,083,904,689 bytes = 1,986.5 MiB delta.
+  This is all runner network traffic, not only Ubuntu mirror downloads.
+- Next steps: fix guest-to-serial marker via privileged CI watcher, align
+  marker names, repair archive-cache ownership/exclusions after unmount,
+  verify a real cache hit, then one minimal-image test. Separate PAM, login
+  shell, firstboot, DHCP/SSH and UEFI outcomes; avoid another full install.

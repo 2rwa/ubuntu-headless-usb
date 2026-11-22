@@ -101,3 +101,18 @@ watcher emits `USB_CI_PAM_PASSWORD_DATE_UPDATED` after PAM has modified
 the shadow password-change date. This distinguishes password-transition
 failure from a successful PAM change with a failed tty1 login-shell marker.
 No conclusions are inferred from a QEMU process merely exiting cleanly.
+
+
+## 2026-11-22 run #44976878592 — result and root cause candidates
+
+- PASSED: static safety; CI minimal image construction; BIOS boot; visible
+  login prompt; QEMU keyboard input of username.
+- Observed shadow password-date update, but no login-shell serial marker.
+  The unprivileged hook's /dev/ttyS0 permissions are the leading cause,
+  subject to confirmation with device stat and login-session evidence.
+- The host also searched the wrong serial marker (missing NET_ prefix).
+- NOT TESTED: firstboot completion, SSH networking, UEFI in this run.
+- Cache restore MISS and cache save FAILURE: root-owned partial/lock files
+  caused tar permission errors; approx 900 MiB of archives not retained.
+- RX delta: 1,986.5 MiB including runner-wide network traffic.
+- Fix cheap checks and cache permission before any next image build.
