@@ -79,6 +79,7 @@ jobs:
             ${{ runner.temp }}/usb-vga-smoke.png
             ${{ runner.temp }}/usb-vga-smoke-qemu.log
             ${{ runner.temp }}/usb-vga-smoke-observer.log
+            ${{ runner.temp }}/usb-vga-smoke-boot-frames/*.png
           if-no-files-found: ignore
   image:
     needs: safety
@@ -209,5 +210,6 @@ jobs:
           path: |
             ${{ runner.temp }}/qemu-*.log
             ${{ runner.temp }}/qemu-*-vga-*.png
+            ${{ runner.temp }}/qemu-*-boot-frames/*.png
             ${{ runner.temp }}/network-*.txt
           if-no-files-found: ignore

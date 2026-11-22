@@ -37,9 +37,19 @@ bash tests/serial-relay.sh "$log" &
 serial_relay_pid=$!
 "${cmd[@]}" >"$log.qemu-stderr" 2>&1 &
 pid=$!
+# Preserve readable VGA boot-console images and correlate with ttyS0 timestamps.
+# The capture-stop ACK must arrive before *any* simulated keyboard input:
+# the observer continues METRICS ONLY for the rest of PAM/SSH verification.
+boot_capture_dir="${RUNNER_TEMP:?}/qemu-$mode-boot-frames"
+boot_capture_stop="${RUNNER_TEMP:?}/qemu-$mode-boot-frames.stop"
+boot_capture_ack="${RUNNER_TEMP:?}/qemu-$mode-boot-frames.stopped"
 echo "LIVE_VGA_BEGIN mode=$mode independent_monitor=$observe_monitor"
 python3 -u tests/qemu-vga-watch.py "$observe_monitor" \
-  "${RUNNER_TEMP:?}/qemu-$mode-vga-watch.log" &
+  "${RUNNER_TEMP:?}/qemu-$mode-vga-watch.log" \
+  --capture-dir "$boot_capture_dir" \
+  --capture-stop-file "$boot_capture_stop" \
+  --capture-ack-file "$boot_capture_ack" \
+  --max-captures 20 &
 vga_watch_pid=$!
 cleanup() {
   kill "$vga_watch_pid" 2>/dev/null || :
@@ -101,6 +111,23 @@ sleep 3
 python3 tests/qemu-vga.py tty1 "$monitor"
 sleep 3
 python3 tests/qemu-vga.py capture "$monitor" "${RUNNER_TEMP:?}/qemu-$mode-vga-before.png"
+# Close the image-capture window BEFORE typing username or passwords.
+# The separate VGA observer stays alive, reporting only change metrics.
+: > "$boot_capture_stop"
+capture_ack=0
+for ((capture_wait=0;capture_wait<80;capture_wait++)); do
+  if [[ -f $boot_capture_ack ]]; then
+    capture_ack=1
+    break
+  fi
+  if ! kill -0 "$vga_watch_pid" 2>/dev/null; then break; fi
+  sleep 0.1
+done
+if [[ $capture_ack != 1 ]]; then
+  echo 'VGA observer did not acknowledge snapshot shutdown; refusing keyboard input' >&2
+  exit 1
+fi
+echo "VGA_BOOT_CAPTURE_STOPPED mode=$mode image_dir=$boot_capture_dir"
 if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
   if [[ $mode == bios && ${USB_CI_VGA_LOGIN:-0} == 1 ]]; then
     wait_marker USB_CI_PRE_ONBOARD_LOCK_OK 60

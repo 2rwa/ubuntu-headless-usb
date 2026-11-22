@@ -197,3 +197,16 @@ No conclusions are inferred from a QEMU process merely exiting cleanly.
 - Correlate VGA_OBSERVER FRAME timestamps with USB_CI_* serial markers and
   respect the 180-second maximum for BIOS/UEFI integrations. No full package
   image is needed to test the concurrency feature.
+
+
+## 2026-11-22 — VGA image capture and serial correlation
+
+- Retain a bounded sequence of boot-only VGA PNG frames with elapsed-time
+  names and per-frame log markers, alongside the unmodified ttyS0 boot log.
+- The monitor is a separate HMP connection from keyboard input.
+- A stop-file/ack-file synchronization barrier is required **before any
+  simulated keyboard or password entry**; continue VGA change metrics but
+  never save frames from the PAM/password phase.
+- Run the no-Ubuntu QEMU smoke before any minimal-image boot; it checks PNG
+  presence, simultaneous keyboard/observer operation, and no new PNG after
+  stopping. Upload saved boot frames as a diagnostic artifact on failure.

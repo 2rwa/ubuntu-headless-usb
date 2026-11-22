@@ -261,3 +261,28 @@ restored its .deb cache successfully and booted to the Linux login prompt in
 an interactive user shell. Login/PAM remains **unresolved**. Parallel VGA
 sampling will expose whether framebuffer content continues changing during
 the login sequence without publishing the password prompts.
+
+
+## 2026-11-22 — Preserve a timestamped VGA boot-image sequence
+
+Numerical VGA change counters alone were insufficient to see which boot
+messages appeared on the virtual video console. The independent HMP observer
+now writes a **bounded pre-login PNG sequence**, retaining up to 20 changed
+frames (approximately 2-second polling) in `qemu-bios-boot-frames/` or
+`qemu-uefi-boot-frames/`. Every PNG is named with its elapsed capture time,
+and `VGA_OBSERVER SNAPSHOT` lines in the live Actions log include the same
+frame and timestamp. The full `ttyS0` stream remains independently logged.
+
+**Security boundary:** Before any emulated keyboard input, the host creates a
+snapshot-stop file and waits for the observer's explicit acknowledgment. The
+observer checks both before and after each QEMU screendump, so no PNG is
+written after stop or while a password could be in flight. VGA monitoring
+continues with **metrics only** after the acknowledgment. All transient PPM
+files are restricted to a temporary 0700 folder and removed. Existing
+explicit, nonsecret `vga-before` and `vga-username` diagnostics remain.
+
+The build-free SeaBIOS regression now tests that PNG snapshots are produced
+and that **no further PNGs appear after the stop acknowledgment**, while a
+separate HMP socket sends keyboard events. Both the PNG series and its
+observer log are uploaded as an Actions artifact. This is an image record of
+the VGA boot console—not OCR or a replacement for serial boot output.
