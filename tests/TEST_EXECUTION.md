@@ -31,3 +31,18 @@
 - The interactive PAM prompt and physical-LAN mDNS remain manual tests.
 - Trigger this one-off integration run on push with `[boot-ci-once]`, preserving
   default static-only CI behavior for subsequent commits.
+
+## 2026-11-22 VGA/real PAM test run
+
+- Previous #8 failed SSH banner exchange, even though service startup markers
+  succeeded; diagnosed from the uploaded QEMU serial log.
+- Now verify that the guest has a QEMU DHCP IPv4 address and that sshd listens
+  on port 22; capture networkctl/route/ss details to ttyS0 when booting.
+- Headless QEMU's emulated standard VGA framebuffer is saved as reviewed PNG
+  evidence, checked for non-blank output and keyboard injection.
+- On BIOS first boot: actually log into tty1, change the generated password via
+  PAM, invoke usb-firstboot-complete, then check SSH using a local forwarded port.
+- On UEFI second boot: check persistence, SSH and framebuffer.
+- One fresh full build, with no firmware and no upload of image/cache/secrets.
+- Result must be reported separately from the initial static checks. On failure,
+  inspect serial and screenshot evidence and update this documentation.
