@@ -78,6 +78,8 @@ for ((i=0;i<45;i++)); do
       ip -o -4 addr show scope global || :
       ip -o link show || :
       ip -4 route show || :
+      printf 'USB_CI_NET_CONFIG mode=%s\n' "$(stat -c %a /etc/systemd/network/20-usb-ethernet.network 2>/dev/null || echo missing)"
+      networkctl status --no-pager --all enp0s2 || :
       networkctl list --no-pager || :
       echo 'USB_CI_NET_EARLY_DETAILS_END'
     } > /dev/ttyS0 2>&1

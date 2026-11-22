@@ -326,3 +326,20 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
   host's 75s window. This test must not bypass DHCP or SSH assertions.
 - Distinguish failure of DHCP itself from a guest/host synchronization race
   and from SSH not listening. Full success is not assumed in advance.
+
+
+
+## 2026-11-22 — Suspected root cause of DHCP unmanaged
+
+- Actions #45011740252 confirmed enp0s2 was DOWN/unmanaged (no address)
+  after firstboot succeeded and all networking services became active.
+- Network config match `Name=en* eth*` covers the QEMU NIC.
+- CI builder inherits `umask 077` into provisioning, making its `cat >`
+  systemd `.network` file mode 0600, which is unreadable by the non-root
+  systemd-networkd daemon. This can explain the unmanaged result.
+- Explicitly chmod that one nonsecret `.network` file 0644. Do not relax
+  private credential permissions.
+- Inspect the *built* image for exact .network mode and match/DHCP content;
+  guest diagnostics print the effective mode and full networkctl status.
+- Next run must verify a real 10.0.2.* DHCP lease, local forwarded SSH,
+  and full UEFI boot/SSH rather than merely a green static check.

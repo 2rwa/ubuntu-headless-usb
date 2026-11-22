@@ -52,6 +52,10 @@ grep -Fq 'for ((i=0;i<45;i++))' "$here/tests/guest-network-watch.sh"
 grep -Fq 'wait_marker USB_CI_NET_READY 75' "$here/tests/qemu-boot.sh"
 grep -Fq 'USB_CI_NET_EARLY_DETAILS_BEGIN' "$here/tests/guest-network-watch.sh"
 grep -Fq 'signal FAILED:no-QEMU-DHCP-address' "$here/tests/guest-network-watch.sh"
+# CI creation uses umask 077: networkd must still read .network as non-root.
+grep -Fq 'chmod 0644 "$ROOT/etc/systemd/network/20-usb-ethernet.network"' "$here/lib/provision.sh"
+grep -Fq "network_file=\"\$root/etc/systemd/network/20-usb-ethernet.network\"" "$here/tests/inspect-root.sh"
+grep -Fq 'stat -c %a "$network_file"' "$here/tests/inspect-root.sh"
 # Cache must be made readable to the non-root archive saver.
 grep -Fq 'sudo chown -R' "$here/.github/workflows/usb-ci.yml"
 grep -Fq 'sudo rm -rf -- "$CACHE/partial"' "$here/.github/workflows/usb-ci.yml"

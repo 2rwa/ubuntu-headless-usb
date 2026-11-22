@@ -359,3 +359,28 @@ CI-only telemetry added without changing the normal USB boot or login:
 The next expensive integration must verify an actual `USB_CI_JOURNAL_BEGIN`
 from the guest and the firstboot lifecycle markers. Static checks alone
 cannot verify journal delivery or identify the root cause of pending network.
+
+
+
+## 2026-11-22 — Why networkd left enp0s2 DOWN/unmanaged
+
+The guest's real DHCP telemetry in [Actions #45011740252](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/45011740252)
+showed `enp0s2: state DOWN`, `networkctl: unmanaged`, and no DHCP lease.
+The QEMU NIC existed, systemd-networkd was active, and the firstboot
+command completed. The match `Name=en* eth*` should include `enp0s2`.
+
+Root cause candidate traced to file permissions: `tests/build-image.sh` sets
+`umask 077` to protect generated passwords, then sources
+`lib/provision.sh`. Its `cat > .../20-usb-ethernet.network` inherits this
+umask and creates a `0600` root-only config, inaccessible to the
+`systemd-network` process. This is consistent with the observed unmanaged
+NIC. This is a change to the **actual physical USB provisioner**, not a
+CI-only diagnostic.
+
+Fix the single nonsecret `.network` file to `0644`; do not weaken the
+credential umask or expose password/private key files. The image root
+inspector now checks that the actual generated file is a regular file with
+mode 0644 and the expected Ethernet DHCP match. The guest CI log also records
+mode and `networkctl status` on a DHCP wait, to verify the effective network
+file and distinguish other possible factors (udev-managed-by, competing config).
+Success is only established by a real DHCP address and SSH integration test.

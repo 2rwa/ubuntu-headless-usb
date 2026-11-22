@@ -12,6 +12,13 @@ grep -Fxq "login_user=$login" "$root/var/lib/ubuntu-usb/identity" || fail 'wrong
 grep -Fxq "runner_user=$service" "$root/var/lib/ubuntu-usb/identity" || fail 'wrong runner identity'
 grep -Fxq "AllowUsers $login" "$root/etc/ssh/sshd_config.d/60-ubuntu-usb.conf" || fail 'SSH allowed user mismatch'
 grep -Fxq "PasswordAuthentication no" "$root/etc/ssh/sshd_config.d/60-ubuntu-usb.conf" || fail 'SSH password auth enabled'
+# This is a functional networkd dependency, not merely a style convention:
+# the image is built with umask 077 but networkd runs as systemd-network.
+network_file="$root/etc/systemd/network/20-usb-ethernet.network"
+[[ -f $network_file && ! -L $network_file ]] || fail 'missing regular .network config'
+[[ $(stat -c %a "$network_file") == 644 ]] || fail '.network config must be 0644 for unprivileged systemd-networkd'
+grep -Fxq 'Name=en* eth*' "$network_file" || fail 'Ethernet match config missing'
+grep -Fxq 'DHCP=yes' "$network_file" || fail 'Ethernet DHCP configuration missing'
 [[ ! -s $root/etc/machine-id ]] || fail 'machine-id must be blank in template'
 [[ ! -e $root/etc/ssh/ssh_host_rsa_key ]] || fail 'SSH host keys pre-generated'
 for unit in ssh.service ssh.socket systemd-networkd.service systemd-resolved.service avahi-daemon.service; do

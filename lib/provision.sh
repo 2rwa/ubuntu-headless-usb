@@ -72,6 +72,11 @@ Name=en* eth*
 DHCP=yes
 IPv6AcceptRA=yes
 EOF
+# CI image builder sets umask 077 for temporary credentials. A .network
+# file created under that umask is root-only (0600), while networkd reads
+# it as systemd-network: the NIC stays DOWN/unmanaged with no DHCP.
+# Make this non-secret interface configuration readable by networkd.
+chmod 0644 "$ROOT/etc/systemd/network/20-usb-ethernet.network"
 cat > "$ROOT/etc/ssh/sshd_config.d/60-ubuntu-usb.conf" <<EOF
 PermitRootLogin no
 PasswordAuthentication no
