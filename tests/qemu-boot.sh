@@ -176,7 +176,9 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
   else
     wait_marker USB_CI_ONBOARD_OK
   fi
-  wait_marker USB_CI_NET_READY 60
+  # Guest's 45s DHCP deadline plus journal diagnostics must fit here;
+  # the earlier 60s/60s race killed the VM before its failure evidence.
+  wait_marker USB_CI_NET_READY 75
   key="${RUNNER_TEMP:?}/usb-ci-ssh-key"
   [[ -s $key ]] || { echo 'CI private SSH key missing' >&2; exit 1; }
   login=${USB_LOGIN_USER:-developer}

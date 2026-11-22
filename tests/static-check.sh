@@ -47,6 +47,11 @@ grep -Fq 'USB_CI_JOURNAL_END' "$here/tests/guest-journal-diagnostics.sh"
 # Even when BIOS integration fails, UEFI must still exercise firmware+VGA.
 grep -Fq "if: always() && steps.imagebuild.outcome == 'success'" "$here/.github/workflows/usb-ci.yml"
 grep -Fq "steps.biosboot.outcome == 'success'" "$here/.github/workflows/usb-ci.yml"
+# Guest network diagnostic must finish ahead of host deadline.
+grep -Fq 'for ((i=0;i<45;i++))' "$here/tests/guest-network-watch.sh"
+grep -Fq 'wait_marker USB_CI_NET_READY 75' "$here/tests/qemu-boot.sh"
+grep -Fq 'USB_CI_NET_EARLY_DETAILS_BEGIN' "$here/tests/guest-network-watch.sh"
+grep -Fq 'signal FAILED:no-QEMU-DHCP-address' "$here/tests/guest-network-watch.sh"
 # Cache must be made readable to the non-root archive saver.
 grep -Fq 'sudo chown -R' "$here/.github/workflows/usb-ci.yml"
 grep -Fq 'sudo rm -rf -- "$CACHE/partial"' "$here/.github/workflows/usb-ci.yml"

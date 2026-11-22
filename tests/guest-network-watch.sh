@@ -65,9 +65,26 @@ for ((i=0;i<limit;i++)); do
   sleep 1
 done
 [[ -f /var/lib/ubuntu-usb/network-enabled ]] || { signal FAILED:no-onboard-marker; exit 1; }
-for ((i=0;i<60;i++)); do
+signal ONBOARD_MARKER_SEEN
+# QEMU user-mode DHCP is usually fast, but on TCG allow 45s. Send a
+# progressive, sanitized network snapshot BEFORE reaching the deadline.
+for ((i=0;i<45;i++)); do
   address=$(ip -o -4 addr show scope global | grep -E 'inet 10[.]0[.]2[.]' || :)
   [[ -z $address ]] || break
+  if (( i == 8 || i == 25 )); then
+    signal "DHCP_WAIT_${i}S"
+    {
+      echo 'USB_CI_NET_EARLY_DETAILS_BEGIN'
+      ip -o -4 addr show scope global || :
+      ip -o link show || :
+      ip -4 route show || :
+      networkctl list --no-pager || :
+      echo 'USB_CI_NET_EARLY_DETAILS_END'
+    } > /dev/ttyS0 2>&1
+    if (( i == 8 )); then
+      /usr/local/sbin/usb-ci-journal-diagnostics || signal JOURNAL_UNAVAILABLE
+    fi
+  fi
   sleep 1
 done
 {
@@ -78,6 +95,14 @@ done
   ss -ltn || :
   echo 'USB_CI_NET_DETAILS_END'
 } > /dev/ttyS0 2>&1
-[[ -n ${address:-} ]] || { signal FAILED:no-QEMU-DHCP-address; exit 1; }
-ss -ltn | grep -Eq '[:.]22[[:space:]]' || { signal FAILED:ssh-port-not-listening; exit 1; }
+if [[ -z ${address:-} ]]; then
+  /usr/local/sbin/usb-ci-journal-diagnostics || :
+  signal FAILED:no-QEMU-DHCP-address
+  exit 1
+fi
+if ! ss -ltn | grep -Eq '[:.]22[[:space:]]'; then
+  /usr/local/sbin/usb-ci-journal-diagnostics || :
+  signal FAILED:ssh-port-not-listening
+  exit 1
+fi
 signal READY

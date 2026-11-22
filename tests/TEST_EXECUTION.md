@@ -292,3 +292,25 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
   actually executes; the bare UEFI pass is not an onboarding/SSH pass.
 - Assert that logs contain real journal records when the 12-second pending
   diagnostic is reached; do not publish credentials or password frames.
+
+
+## 2026-11-22 — #45001068699: onboard success, network watcher race
+
+- Minimal Ubuntu build and .deb cache hit: passed.
+- Legacy BIOS systemd boot: 27s; PAM password change and tty1 user login:
+  passed. sudo firstboot actually executed as root (journal verified).
+- FIRSTBOOT_BEGIN and FIRSTBOOT_OK: both observed (24s). At the first
+  pending snapshot, resolved was activating, while networkd, ssh, and Avahi
+  were still inactive; this was before the firstboot script completed.
+- Host waited 60s for USB_CI_NET_READY. Guest also waited up to 60s for
+  10.0.2.* DHCP before reporting details. Both timers expired together;
+  host terminated QEMU before the guest could report whether DHCP failed.
+  No claim of a networkd failure is justified from this evidence alone.
+- UEFI boot + readable VGA: passed in fallback mode (26s to systemd);
+  full UEFI network/SSH not yet tested.
+- Fix: emit guest ONBOARD_MARKER_SEEN; progressive network status at 8/25s;
+  45s guest DHCP deadline with journal/status before explicit FAILED;
+  75s host wait, still below 180s BIOS integration ceiling.
+- Next run must assert whether 10.0.2.* DHCP is obtained or why it fails,
+  and whether public-key SSH becomes available. Avoid relaxing the actual
+  DHCP/network/SSH acceptance criteria merely to turn CI green.
