@@ -136,6 +136,26 @@ jobs:
           fi
           sudo -E bash tests/build-image.sh "$IMAGE"
           df -h
+      - name: Prepare .deb cache for unprivileged Actions archive save
+        if: always() && env.CACHE_ENABLED == 'true'
+        run: |
+          [[ "$CACHE" == "$RUNNER_TEMP/ubuntu-usb-apt-cache" && -d "$CACHE" && ! -L "$CACHE" ]] || {
+            echo 'Unexpected APT cache directory: refusing permission changes' >&2
+            exit 1
+          }
+          if mountpoint -q "$CACHE"; then
+            echo 'APT cache is still mounted: refusing archive save' >&2
+            exit 1
+          fi
+          # APT created root-owned lock/partial entries, which made
+          # actions/cache/save fail with tar Permission denied.
+          sudo rm -rf -- "$CACHE/partial"
+          sudo rm -f -- "$CACHE/lock"
+          sudo chown -R "$(id -u):$(id -g)" "$CACHE"
+          sudo chmod -R u+rwX "$CACHE"
+          printf 'Readable .deb files: '
+          find "$CACHE" -maxdepth 1 -type f -name '*.deb' | wc -l
+          du -sh "$CACHE"
       - name: BIOS boot
         if: (github.event_name == 'workflow_dispatch' && inputs.level == 'boot') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[boot-ci-once]'))
         run: bash tests/qemu-boot.sh bios "$IMAGE" "${{ runner.temp }}/qemu-bios.log"

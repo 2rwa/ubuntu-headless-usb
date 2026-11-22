@@ -116,3 +116,17 @@ No conclusions are inferred from a QEMU process merely exiting cleanly.
   caused tar permission errors; approx 900 MiB of archives not retained.
 - RX delta: 1,986.5 MiB including runner-wide network traffic.
 - Fix cheap checks and cache permission before any next image build.
+
+
+## 2026-11-22 fix following #44976878592
+
+1. CI-only shell marker now goes to a private file in the user's home,
+   not to protected root:dialout ttyS0. A root-owned guest watcher checks the
+   marker UID before relaying USB_CI_VGA_LOGIN_OK over the serial console.
+2. Host looks for USB_CI_NET_PAM_PASSWORD_DATE_UPDATED exactly; separate
+   password-expiry and login-shell assertions are retained.
+3. Workflow strips stale APT lock/partial files and chowns only the guarded
+   cache directory to the Actions runner before actions/cache/save.
+4. Low-cost tests check the marker boundary and cache permission step.
+   Run cheap safety checks first, then one opt-in minimal-image integration.
+   Full success and the next cache hit still require real validation.

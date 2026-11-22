@@ -11,7 +11,20 @@ if [[ -f /etc/ubuntu-usb-ci-vga-mode ]]; then
   login=$(sed -n 's/^login_user=//p' /var/lib/ubuntu-usb/identity)
 fi
 reported=0
+login_reported=0
+if [[ $vga == 1 ]]; then
+  expected_uid=$(id -u "$login")
+fi
 for ((i=0;i<limit;i++)); do
+  # The root watcher is the only CI component allowed to write ttyS0.
+  if [[ $vga == 1 && $login_reported == 0 ]]; then
+    marker="/home/$login/.usb-ci-vga-login-ok"
+    if [[ -f $marker && ! -L $marker && $(stat -c %u "$marker") == "$expected_uid" ]]; then
+      rm -f -- "$marker"
+      printf 'USB_CI_VGA_LOGIN_OK\n' > /dev/ttyS0
+      login_reported=1
+    fi
+  fi
   [[ ! -f /var/lib/ubuntu-usb/network-enabled ]] || break
   if [[ $vga == 1 && $reported == 0 ]]; then
     last_change=$(awk -F: -v u="$login" '$1==u {print $3}' /etc/shadow)

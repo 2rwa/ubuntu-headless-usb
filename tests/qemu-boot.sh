@@ -91,7 +91,7 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     sleep 3
     python3 tests/qemu-vga.py type-file "$monitor" "$replacement"
     if ! wait_marker USB_CI_VGA_LOGIN_OK 45; then
-      if grep -aq USB_CI_PAM_PASSWORD_DATE_UPDATED "$log"; then
+      if grep -aq USB_CI_NET_PAM_PASSWORD_DATE_UPDATED "$log"; then
         echo 'PAM did update shadow, but a tty1 login shell marker was not observed' >&2
       else
         echo 'No PAM password-change evidence was observed on the guest serial port' >&2

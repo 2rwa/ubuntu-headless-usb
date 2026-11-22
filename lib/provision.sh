@@ -147,7 +147,7 @@ Description=USB CI guest DHCP and SSH readiness check
 After=multi-user.target
 [Service]
 Type=oneshot
-TimeoutStartSec=260
+TimeoutStartSec=750
 ExecStart=/usr/local/sbin/usb-ci-network-watch
 [Install]
 WantedBy=multi-user.target
@@ -161,7 +161,10 @@ case "$(tty 2>/dev/null)" in
   /dev/tty1)
     login_user=$(sed -n 's/^login_user=//p' /var/lib/ubuntu-usb/identity)
     if [ "$(id -un)" = "$login_user" ]; then
-      printf 'USB_CI_VGA_LOGIN_OK\n' > /dev/ttyS0
+      # The login user cannot write root:dialout /dev/ttyS0. Signal through
+      # a private nonsecret home marker; the root CI watcher emits serial.
+      umask 077
+      : > "$HOME/.usb-ci-vga-login-ok"
     fi
     ;;
 esac

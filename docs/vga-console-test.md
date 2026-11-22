@@ -169,3 +169,26 @@ real tty1/PAM login and SSH remain incomplete in the extended scenario.
   marker names, repair archive-cache ownership/exclusions after unmount,
   verify a real cache hit, then one minimal-image test. Separate PAM, login
   shell, firstboot, DHCP/SSH and UEFI outcomes; avoid another full install.
+
+
+## 2026-11-22 — CI login marker & cache permission fix
+
+- In CI VGA mode the real login shell writes a private, nonsecret marker
+  to the login user's home only after entering tty1 with the expected UID.
+  The root-owned guest network watcher validates the marker owner, removes
+  it, and emits USB_CI_VGA_LOGIN_OK to ttyS0. No dialout group membership
+  or insecure ttyS0 permission changes are needed.
+- Host diagnostics now match the watcher output exactly:
+  USB_CI_NET_PAM_PASSWORD_DATE_UPDATED. A shadow date update alone does not
+  prove that an interactive login shell opened.
+- The watchdog service timeout has been aligned with its longer CI VGA
+  polling budget.
+- The image job now normalizes only the protected RUNNER_TEMP archive-cache
+  directory after debootstrap unmounts it: removes APT lock/partial files,
+  changes cache ownership to the Actions runner, and permits the archive
+  save step to read files. Neither the raw image nor secret credentials are
+  included in cache.
+- Preserve distinct positive assertions for screen rendering, typed username,
+  PAM shadow date, tty1 login shell, onboarding, DHCP/SSH and UEFI.
+- These fixes address observed defects from Actions #44976878592; full boot
+  success and a subsequent cache HIT are pending integration verification.

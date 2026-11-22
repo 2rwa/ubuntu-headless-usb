@@ -7,6 +7,16 @@ done
 python3 -m py_compile "$here/tests/qemu-vga.py"
 python3 "$here/tests/test_qemu_vga.py"
 bash -n "$here/tests/vga-smoke.sh"
+# Regressions found in the first minimal-image/PAM run:
+# only root's guest network watcher writes ttyS0; host marker names match.
+grep -Fq '.usb-ci-vga-login-ok' "$here/lib/provision.sh"
+grep -Fq '.usb-ci-vga-login-ok' "$here/tests/guest-network-watch.sh"
+grep -Fq 'USB_CI_VGA_LOGIN_OK' "$here/tests/guest-network-watch.sh"
+grep -Fq 'USB_CI_NET_PAM_PASSWORD_DATE_UPDATED' "$here/tests/qemu-boot.sh"
+! grep -Fq 'USB_CI_VGA_LOGIN_OK' "$here/lib/provision.sh"
+# Cache must be made readable to the non-root archive saver.
+grep -Fq 'sudo chown -R' "$here/.github/workflows/usb-ci.yml"
+grep -Fq 'sudo rm -rf -- "$CACHE/partial"' "$here/.github/workflows/usb-ci.yml"
 grep -Fxq 'linux-generic' "$here/config/packages-vga.txt"
 ! grep -Eq '^(npm|nodejs|build-essential|cmake|linux-firmware)$' "$here/config/packages-vga.txt"
 bash "$here/install.sh" --help | grep -q -- '--apply'
