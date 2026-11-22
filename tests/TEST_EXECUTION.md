@@ -53,3 +53,14 @@ Run #12 (2026-11-22) built the system and started getty@tty1 but aborted
 because the capture code demanded three colors. A two-color console is normal.
 The test now uses all-pixel statistics, preserves blank-screen PNGs, and
 activates tty1. Recheck with cheap unit tests before another full-image run.
+
+## 2026-11-22 VGA test recheck #13
+
+- Opt-in trigger for a single new 25 GiB sparse-image build: `[boot-ci-once]`.
+- Regression fixed: count all VGA pixels instead of requiring three sampled
+  colors; a two-color text console is normal and must be accepted.
+- Retain PNG on blank-screen failure and include diagnostic pixel counts.
+- Force Linux tty1 to the VGA output before capturing the login prompt.
+- Run the same BIOS→PAM password-change→network/SSH→UEFI checks, reporting
+  partial success separately from full completion.
+- No firmware, no package cache or raw-image artifact, no physical USB target.
