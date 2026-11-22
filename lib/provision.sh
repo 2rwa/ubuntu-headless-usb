@@ -80,6 +80,8 @@ EOF
 rm -f "$ROOT/etc/resolv.conf"
 ln -s /run/systemd/resolve/stub-resolv.conf "$ROOT/etc/resolv.conf"
 # Ubuntu 24.04 uses ssh.socket by default; both activation paths must be blocked.
+# An offline console login must be present on real headless hardware.
+chroot "$ROOT" systemctl enable getty@tty1.service
 chroot "$ROOT" systemctl mask systemd-networkd.service systemd-networkd.socket \
   systemd-resolved.service ssh.service ssh.socket avahi-daemon.service avahi-daemon.socket
 install -m 755 "$HERE/firstboot-complete.sh" "$ROOT/usr/local/sbin/usb-firstboot-complete"
@@ -106,7 +108,7 @@ if [[ ${USB_CI_SERIAL:-0} == 1 ]]; then
   cat >> "$ROOT/etc/default/grub" <<'CIEOF'
 GRUB_TERMINAL="serial console"
 GRUB_SERIAL_COMMAND="serial --speed=115200"
-GRUB_CMDLINE_LINUX="console=ttyS0,115200n8"
+GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200n8"
 CIEOF
   cat > "$ROOT/etc/systemd/system/ubuntu-usb-ci-ready.service" <<'CIEOF'
 [Unit]
@@ -131,6 +133,20 @@ ExecStart=/usr/local/sbin/usb-ci-onboard-verify
 WantedBy=multi-user.target
 CIEOF
   chroot "$ROOT" systemctl enable ubuntu-usb-ci-onboard.service
+  if [[ ${USB_CI_VGA_LOGIN:-0} == 1 ]]; then
+    touch "$ROOT/etc/ubuntu-usb-ci-vga-mode"
+    cat > "$ROOT/etc/profile.d/usb-ci-vga-login.sh" <<'CIEOF'
+# CI-only: prove a real login shell has opened on the VGA tty1.
+case "$(tty 2>/dev/null)" in
+  /dev/tty1)
+    login_user=$(sed -n 's/^login_user=//p' /var/lib/ubuntu-usb/identity)
+    if [ "$(id -un)" = "$login_user" ]; then
+      printf 'USB_CI_VGA_LOGIN_OK\n' > /dev/ttyS0
+    fi
+    ;;
+esac
+CIEOF
+  fi
 fi
 chroot "$ROOT" update-initramfs -u -k all
 chroot "$ROOT" grub-install --target=i386-pc --recheck "$DEV"

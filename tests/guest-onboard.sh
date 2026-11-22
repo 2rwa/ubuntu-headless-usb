@@ -27,6 +27,8 @@ if [[ ! -f /var/lib/ubuntu-usb/network-enabled ]]; then
     fail runner-may-onboard
   fi
   signal PRE_ONBOARD_LOCK_OK
+  # A real VGA/PAM login will perform this transition; do not preempt it.
+  [[ ! -f /etc/ubuntu-usb-ci-vga-mode ]] || exit 0
 
   # Simulate PAM's password-change date update, not the interactive PAM flow.
   chage -d "$(date +%F)" "$login"

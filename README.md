@@ -68,6 +68,11 @@ lower when omitting firmware. Packages and mirrors change over time.
 Repeated builds should use pinned Ubuntu release components and compare the
 observed network bytes rather than relying on these estimates.
 
+The QEMU boot job can also capture actual VGA framebuffer PNGs (without a
+desktop environment), inject virtual keyboard events, and test forced first
+login/password change via tty1. See [VGA test documentation](docs/vga-console-test.md).
+This is an opt-in heavyweight test; push/PR runs only cheap checks.
+
 The boot job also verifies the initial network/SSH lock, expected refusal of
 premature onboarding and runner registration, a **simulated** successful local
 password-change date update, firstboot service activation, public-key SSH

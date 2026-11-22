@@ -64,6 +64,13 @@ ssh-keygen -q -t ed25519 -N '' -f "$keybase"
 KEY="$keybase.pub"
 USB_PROVISION_FROM_WRAPPER=1
 source "$HERE/lib/provision.sh"
+if [[ ${USB_CI_VGA_LOGIN:-0} == 1 ]]; then
+  passfile="$RUNNER_TEMP/usb-ci-initial-password"
+  [[ ! -e $passfile && ! -L $passfile ]] || die 'CI password file collision'
+  printf '%s\n' "$PASS" > "$passfile"
+  chmod 600 "$passfile"
+  chown "$(stat -c %u "$RUNNER_TEMP")":"$(stat -c %g "$RUNNER_TEMP")" "$passfile"
+fi
 bash "$HERE/tests/inspect-root.sh" "$ROOT" "$LOGIN_USER" "$RUNNER_USER" "$LUID" "$RUID" "$ROOTPART" "$ESP"
 sync
 echo "PASS: provisioned and inspected $IMAGE"

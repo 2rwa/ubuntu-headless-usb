@@ -63,6 +63,7 @@ jobs:
       USB_CI_EXPLICIT: 'yes'
       USB_CI_KEEP_KEY: '1'
       USB_CI_VERIFY_ONBOARD: '1'
+      USB_CI_VGA_LOGIN: '1'
     steps:
       - uses: actions/checkout@v4
       - name: Set isolated working paths
@@ -107,7 +108,7 @@ jobs:
         run: bash tests/qemu-boot.sh uefi "$IMAGE" "${{ runner.temp }}/qemu-uefi.log"
       - name: Remove temporary CI SSH credentials
         if: always()
-        run: sudo rm -f "$RUNNER_TEMP/usb-ci-ssh-key" "$RUNNER_TEMP/usb-ci-ssh-key.pub"
+        run: sudo rm -f "$RUNNER_TEMP/usb-ci-ssh-key" "$RUNNER_TEMP/usb-ci-ssh-key.pub" "$RUNNER_TEMP/usb-ci-initial-password" "$RUNNER_TEMP/usb-ci-next-password"
       - name: Network usage summary
         if: always()
         run: |
@@ -130,5 +131,6 @@ jobs:
           name: usb-ci-logs
           path: |
             ${{ runner.temp }}/qemu-*.log
+            ${{ runner.temp }}/qemu-*-vga-*.png
             ${{ runner.temp }}/network-*.txt
           if-no-files-found: ignore
