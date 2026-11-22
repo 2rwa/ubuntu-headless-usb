@@ -236,3 +236,19 @@ shell. New checker verifies root login PID/child shell UID and command
 and the existing shadow-date transition, then emits the same serial success
 marker. Test exact process-parent/UID cases without building Ubuntu; only
 after safety success launch one cached minimal boot test.
+
+
+## 2026-11-22: one-off cached minimal integration after tty1 checker
+
+- Static/safety and PID/PPID/UID login verifier tests passed in
+  [Actions #44987020713](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44987020713).
+- Invoke only one [boot-ci-once] minimal build with .deb cache and both
+  BIOS/UEFI attempts. Expect the root watcher to observe a tty1 user bash
+  immediately descended from root-owned login(1) **after** the PAM shadow
+  date transition, then send USB_CI_VGA_LOGIN_OK over serial.
+- After this marker, the host sends sudo usb-firstboot-complete; check the
+  real network-enabled flag, DHCP IPv4, SSH key authentication, root/runner
+  SSH denial and UEFI boot. Preserve precise failure stage if blocked.
+- Retain serial logs and only precredential VGA PNGs, never passwords.
+- Each BIOS or UEFI stage has a 180-second overall limit; the heavy CI job
+  retains the 120-minute workflow guard for image building.
