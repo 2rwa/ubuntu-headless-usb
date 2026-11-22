@@ -57,14 +57,16 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
-      IMAGE: ${{ runner.temp }}/ubuntu-usb-ci.raw
-      CACHE: ${{ runner.temp }}/ubuntu-usb-apt-cache
       USB_LOGIN_USER: ${{ inputs.login_user }}
       USB_RUNNER_USER: ${{ inputs.runner_user }}
       USB_SKIP_FIRMWARE: ${{ inputs.include_firmware && '0' || '1' }}
       USB_CI_EXPLICIT: 'yes'
     steps:
       - uses: actions/checkout@v4
+      - name: Set isolated working paths
+        run: |
+          echo "IMAGE=$RUNNER_TEMP/ubuntu-usb-ci.raw" >> "$GITHUB_ENV"
+          echo "CACHE=$RUNNER_TEMP/ubuntu-usb-apt-cache" >> "$GITHUB_ENV"
       - name: Measure network at start
         run: bash tests/network-bytes.sh | tee "${{ runner.temp }}/network-start.txt"
       - name: Host dependencies
@@ -72,6 +74,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends debootstrap gdisk parted dosfstools e2fsprogs qemu-system-x86 ovmf
       - name: Restore cached .deb packages (optional)
+        id: aptcache
         if: inputs.cache_debs
         uses: actions/cache/restore@v4
         with:
@@ -102,7 +105,7 @@ jobs:
           du -sh "$CACHE" 2>/dev/null || true
           du -sh "$IMAGE" 2>/dev/null || true
       - name: Save .deb cache (optional, cache miss only)
-        if: always() && inputs.cache_debs
+        if: always() && inputs.cache_debs && steps.aptcache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ env.CACHE }}

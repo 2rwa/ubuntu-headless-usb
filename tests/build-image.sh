@@ -25,7 +25,7 @@ cleanup() {
     rmdir "$ROOT" 2>/dev/null || :
   fi
   [[ -z $DEV ]] || losetup -d "$DEV" || :
-  [[ -z $KEY ]] || rm -f "$KEY" "$KEY.pub"
+  [[ -z $KEY ]] || rm -f "$KEY" "${KEY%.pub}"
   if [[ -e $IMAGE ]]; then
     du -h "$IMAGE" || :
     if [[ -n ${SUDO_UID:-} && -n ${SUDO_GID:-} ]]; then
