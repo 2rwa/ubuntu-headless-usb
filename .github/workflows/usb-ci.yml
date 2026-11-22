@@ -78,6 +78,7 @@ jobs:
           path: |
             ${{ runner.temp }}/usb-vga-smoke.png
             ${{ runner.temp }}/usb-vga-smoke-qemu.log
+            ${{ runner.temp }}/usb-vga-smoke-observer.log
           if-no-files-found: ignore
   image:
     needs: safety

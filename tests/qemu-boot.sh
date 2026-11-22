@@ -7,12 +7,16 @@ mode=${1:?mode} image=${2:?image} log=${3:?log}
 port=22289
 cmd=(qemu-system-x86_64 -machine q35,accel=tcg -m 2048 -smp 2 -display none
   -monitor "unix:${RUNNER_TEMP:?}/qemu-$mode.monitor,server=on,wait=off"
+  # A second HMP socket permits VGA observation while the first sends keys.
+  -monitor "unix:${RUNNER_TEMP:?}/qemu-$mode.observe.monitor,server=on,wait=off"
   -vga std -serial "file:$log"
   -netdev "user,id=usbci,restrict=on,hostfwd=tcp:127.0.0.1:$port-:22"
   -device virtio-net-pci,netdev=usbci -drive "file=$image,format=raw,if=virtio")
 scratch=''
 monitor="${RUNNER_TEMP:?}/qemu-$mode.monitor"
-[[ ! -e $monitor ]] || { echo "QEMU monitor socket collision" >&2; exit 1; }
+observe_monitor="${RUNNER_TEMP:?}/qemu-$mode.observe.monitor"
+[[ ! -e $monitor && ! -e $observe_monitor ]] ||
+  { echo "QEMU monitor socket collision" >&2; exit 1; }
 if [[ $mode == uefi ]]; then
   code=/usr/share/OVMF/OVMF_CODE_4M.fd
   vars=/usr/share/OVMF/OVMF_VARS_4M.fd
@@ -33,13 +37,20 @@ bash tests/serial-relay.sh "$log" &
 serial_relay_pid=$!
 "${cmd[@]}" >"$log.qemu-stderr" 2>&1 &
 pid=$!
+echo "LIVE_VGA_BEGIN mode=$mode independent_monitor=$observe_monitor"
+python3 -u tests/qemu-vga-watch.py "$observe_monitor" \
+  "${RUNNER_TEMP:?}/qemu-$mode-vga-watch.log" &
+vga_watch_pid=$!
 cleanup() {
+  kill "$vga_watch_pid" 2>/dev/null || :
+  wait "$vga_watch_pid" 2>/dev/null || :
   kill "$pid" 2>/dev/null || :
   wait "$pid" 2>/dev/null || :
   kill "$serial_relay_pid" 2>/dev/null || :
   wait "$serial_relay_pid" 2>/dev/null || :
   [[ -z $scratch ]] || rm -f "$scratch"
-  rm -f "$monitor"
+  rm -f "$monitor" "$observe_monitor"
+  echo "LIVE_VGA_END mode=$mode"
   echo "LIVE_SERIAL_END mode=$mode"
 }
 trap cleanup EXIT
@@ -62,6 +73,11 @@ wait_marker() {
     if grep -aq 'USB_CI_ONBOARD_FAILED:' "$log" 2>/dev/null; then
       echo "Guest onboarding assertion failed:" >&2
       grep -a 'USB_CI_ONBOARD_FAILED:' "$log" >&2
+      return 1
+    fi
+    if ! kill -0 "$vga_watch_pid" 2>/dev/null; then
+      echo "Concurrent VGA observer exited unexpectedly ($mode)" >&2
+      tail -n 20 "${RUNNER_TEMP:?}/qemu-$mode-vga-watch.log" >&2 || :
       return 1
     fi
     if ! kill -0 "$pid" 2>/dev/null; then

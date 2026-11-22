@@ -231,3 +231,33 @@ actual result and cache-save outcome are available.
   through ttyS0. Never stream/retain a screenshot of password entry.
 - These updates affect only the CI test harness; physical USB login and
   production password handling remain unchanged.
+
+## 2026-11-22 — parallel serial and VGA observation, no framebuffer leak
+
+QEMU now exposes two independent **local-only** HMP Unix sockets. The input
+monitor continues sending VT1 keyboard events and doing explicit safe PNG
+captures. The second monitor is owned by `tests/qemu-vga-watch.py`, which
+polls the VGA framebuffer independently every 2 seconds while serial is
+streamed by `tests/serial-relay.sh`. Both report real-time timestamps to the
+same Actions job and save separate text-only diagnostics.
+
+The observer records framebuffer size, sparse foreground pixel count, changed
+scanline count and first/last changed row. It deliberately does **not** save
+PNG images, OCR text, or a full PPM artifact during password entry. QEMU's
+transient screendump lives in a 0700 temporary directory and is deleted after
+measurement. The two monitors avoid races between `sendkey` and `screendump`
+over a single HMP socket. Background observers are terminated with QEMU.
+
+The standalone no-Ubuntu `tests/vga-smoke.sh` exercises concurrent VGA
+observation and keyboard commands against the two HMP sockets, and the cheap
+Python test verifies framebuffer row-change detection. The real Ubuntu boot
+integration test still has a 180-second overall timeout.
+
+Most recent minimal Ubuntu integration run
+[Actions #44980879541](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44980879541)
+restored its .deb cache successfully and booted to the Linux login prompt in
+37 seconds. PAM's shadow-date transition was detected, but a tty1 listing
+10 seconds later still showed only the root-owned `login` process, without
+an interactive user shell. Login/PAM remains **unresolved**. Parallel VGA
+sampling will expose whether framebuffer content continues changing during
+the login sequence without publishing the password prompts.

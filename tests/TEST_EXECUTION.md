@@ -170,3 +170,16 @@ No conclusions are inferred from a QEMU process merely exiting cleanly.
 - Check for actual APT cache restore HIT. In case of login failure inspect
   PAM_PASSWORD_DATE_UPDATED, LOGIN_MARKER_PENDING and tty1 process listing.
 - Do not rerun the full development-tool package profile for this test.
+
+## 2026-11-22 concurrent VGA + serial diagnostic plan
+
+- Build-free regression: independent HMP monitor sockets used concurrently by
+  a VGA watcher and the keyboard/screenshot command; no full Ubuntu rebuild.
+- Serial: live raw ttyS0 output and preserved complete log as before.
+- VGA: every 2 seconds report framebuffer geometry and row-change metrics to
+  Actions stdout plus text log; transient PPM stored in private 0700 directory
+  and removed immediately. Do not upload frames collected during secrets.
+- Keep full 180-second BIOS/UEFI budget and per-marker wait timeouts.
+- The prior minimal run #44980879541 was **not** a successful PAM login; even
+  though the shadow date changed, guest tty1 showed root-owned `login` but
+  not a user shell. APT restore did produce a cache hit.
