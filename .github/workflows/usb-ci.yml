@@ -15,8 +15,12 @@ on:
       level:
         description: 'test depth'
         type: choice
-        options: [static, image, boot]
+        options: [static, vga, image, boot]
         default: static
+      minimal_image:
+        description: 'CI-only minimal Ubuntu profile (no developer packages)'
+        type: boolean
+        default: true
       include_firmware:
         description: 'Download linux-firmware (large, omit by default)'
         type: boolean
@@ -51,9 +55,33 @@ jobs:
           if command -v shellcheck >/dev/null; then
             shellcheck -S error install.sh lib/provision.sh firstboot-complete.sh register-runner.sh tests/*.sh
           fi
+  vga:
+    needs: safety
+    if: (github.event_name == 'workflow_dispatch' && inputs.level == 'vga') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[vga-ci-once]'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install QEMU only when absent
+        run: |
+          if ! command -v qemu-system-x86_64 >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends qemu-system-x86
+          fi
+      - name: SeaBIOS VGA framebuffer and HMP keyboard smoke
+        run: bash tests/vga-smoke.sh
+      - name: Upload VGA smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: usb-vga-smoke
+          path: |
+            ${{ runner.temp }}/usb-vga-smoke.png
+            ${{ runner.temp }}/usb-vga-smoke-qemu.log
+          if-no-files-found: ignore
   image:
     needs: safety
-    if: (github.event_name == 'workflow_dispatch' && inputs.level != 'static') || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[image-ci-once]') || contains(github.event.head_commit.message, '[boot-ci-once]')))
+    if: (github.event_name == 'workflow_dispatch' && (inputs.level == 'image' || inputs.level == 'boot')) || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[image-ci-once]') || contains(github.event.head_commit.message, '[boot-ci-once]')))
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -64,6 +92,8 @@ jobs:
       USB_CI_KEEP_KEY: '1'
       USB_CI_VERIFY_ONBOARD: '1'
       USB_CI_VGA_LOGIN: '1'
+      USB_CI_MINIMAL: ${{ ((github.event_name == 'workflow_dispatch' && inputs.minimal_image) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[boot-ci-once]'))) && '1' || '0' }}
+      CACHE_ENABLED: ${{ (github.event_name == 'workflow_dispatch' && inputs.cache_debs) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[boot-ci-once]')) }}
     steps:
       - uses: actions/checkout@v4
       - name: Set isolated working paths
@@ -83,17 +113,23 @@ jobs:
             [[ "$package" == linux-firmware && "$USB_SKIP_FIRMWARE" == 1 ]] && continue
             apt-cache show "$package" >/dev/null || { echo "Missing package: $package" >&2; exit 1; }
           done < config/packages.txt
+          if [[ "$USB_CI_MINIMAL" == 1 ]]; then
+            while IFS= read -r package; do
+              [[ "$package" =~ ^[a-z0-9][a-z0-9+.-]*$ ]] || continue
+              apt-cache show "$package" >/dev/null || { echo "Missing minimal package: $package" >&2; exit 1; }
+            done < config/packages-vga.txt
+          fi
       - name: Restore cached .deb packages (optional)
         id: aptcache
-        if: inputs.cache_debs
+        if: env.CACHE_ENABLED == 'true'
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.CACHE }}
-          key: noble-amd64-debs-v1-${{ hashFiles('config/packages.txt') }}-${{ inputs.include_firmware && 'withfw' || 'nofw' }}
+          key: noble-amd64-debs-v2-${{ env.USB_CI_MINIMAL }}-${{ hashFiles('config/packages.txt', 'config/packages-vga.txt') }}-${{ inputs.include_firmware && 'withfw' || 'nofw' }}
       - name: Build and inspect isolated image
         run: |
           mkdir -p "$CACHE"
-          if [[ "${{ inputs.cache_debs }}" != "true" ]]; then
+          if [[ "$CACHE_ENABLED" != "true" ]]; then
             unset USB_APT_CACHE_DIR
           else
             export USB_APT_CACHE_DIR="$CACHE"
@@ -119,11 +155,11 @@ jobs:
           du -sh "$CACHE" 2>/dev/null || true
           du -sh "$IMAGE" 2>/dev/null || true
       - name: Save .deb cache (optional, cache miss only)
-        if: always() && inputs.cache_debs && steps.aptcache.outputs.cache-hit != 'true'
+        if: always() && env.CACHE_ENABLED == 'true' && steps.aptcache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ env.CACHE }}
-          key: noble-amd64-debs-v1-${{ hashFiles('config/packages.txt') }}-${{ inputs.include_firmware && 'withfw' || 'nofw' }}
+          key: noble-amd64-debs-v2-${{ env.USB_CI_MINIMAL }}-${{ hashFiles('config/packages.txt', 'config/packages-vga.txt') }}-${{ inputs.include_firmware && 'withfw' || 'nofw' }}
       - name: Upload boot and measurement logs (never upload disk image)
         if: always()
         uses: actions/upload-artifact@v4
