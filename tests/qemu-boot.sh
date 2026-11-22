@@ -36,6 +36,12 @@ wait_marker() {
   local marker=$1 limit=${2:-180}
   for ((i=0; i<limit; i++)); do
     if grep -aq "$marker" "$log" 2>/dev/null; then return 0; fi
+    if grep -aq 'USB_CI_NET_FAILED:' "$log" 2>/dev/null; then
+      echo "Guest network diagnostic failed:" >&2
+      grep -a 'USB_CI_NET_FAILED:' "$log" >&2
+      tail -c 6000 "$log" >&2 || :
+      return 1
+    fi
     if grep -aq 'USB_CI_ONBOARD_FAILED:' "$log" 2>/dev/null; then
       echo "Guest onboarding assertion failed:" >&2
       grep -a 'USB_CI_ONBOARD_FAILED:' "$log" >&2
@@ -89,6 +95,7 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
   else
     wait_marker USB_CI_ONBOARD_OK
   fi
+  wait_marker USB_CI_NET_READY 60
   key="${RUNNER_TEMP:?}/usb-ci-ssh-key"
   [[ -s $key ]] || { echo 'CI private SSH key missing' >&2; exit 1; }
   login=${USB_LOGIN_USER:-developer}

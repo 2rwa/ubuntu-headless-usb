@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
-for script in install.sh lib/provision.sh firstboot-complete.sh register-runner.sh tests/static-check.sh tests/guest-onboard.sh tests/qemu-boot.sh tests/build-image.sh tests/inspect-root.sh tests/safety-test.sh tests/network-bytes.sh; do
+for script in install.sh lib/provision.sh firstboot-complete.sh register-runner.sh tests/static-check.sh tests/guest-onboard.sh tests/qemu-boot.sh tests/build-image.sh tests/inspect-root.sh tests/safety-test.sh tests/network-bytes.sh tests/guest-network-watch.sh; do
   bash -n "$here/$script"
 done
 python3 -m py_compile "$here/tests/qemu-vga.py"

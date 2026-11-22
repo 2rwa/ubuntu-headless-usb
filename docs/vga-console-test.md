@@ -51,6 +51,19 @@ getty@tty1 without test-only services.
   cache, based on the earlier 2026-11-22 successful run. Avoid repeated heavy
   tests when a static check can identify the failure.
 
+## CI regression and network diagnosis
+
+- 2026-11-22 [Actions #8](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44971209887):
+  basic OS construction and BIOS boot succeeded. The guest reported networkd,
+  Avahi and sshd *active*, but host-forwarded SSH stalled before the banner.
+  This is a regression in the extended network test, **not** a passing SSH check.
+- `tests/guest-network-watch.sh` now reports IPv4 addresses, routes,
+  `networkctl` and listening sockets over the serial console. It fails if
+  QEMU DHCP did not assign an address or if port 22 is not listening.
+- `tests/qemu-boot.sh` waits for `USB_CI_NET_READY` before trying SSH.
+  It does **not** disable QEMU's `restrict=on` isolation to hide forwarding
+  problems.
+
 ## Code layout
 
 - `tests/qemu-vga.py`: HMP monitor keyboard and PPM-to-PNG screenshot helper.

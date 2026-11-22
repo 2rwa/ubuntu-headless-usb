@@ -133,6 +133,19 @@ ExecStart=/usr/local/sbin/usb-ci-onboard-verify
 WantedBy=multi-user.target
 CIEOF
   chroot "$ROOT" systemctl enable ubuntu-usb-ci-onboard.service
+  install -m 755 "$HERE/tests/guest-network-watch.sh" "$ROOT/usr/local/sbin/usb-ci-network-watch"
+  cat > "$ROOT/etc/systemd/system/ubuntu-usb-ci-network-watch.service" <<'CIEOF'
+[Unit]
+Description=USB CI guest DHCP and SSH readiness check
+After=multi-user.target
+[Service]
+Type=oneshot
+TimeoutStartSec=260
+ExecStart=/usr/local/sbin/usb-ci-network-watch
+[Install]
+WantedBy=multi-user.target
+CIEOF
+  chroot "$ROOT" systemctl enable ubuntu-usb-ci-network-watch.service
   if [[ ${USB_CI_VGA_LOGIN:-0} == 1 ]]; then
     touch "$ROOT/etc/ubuntu-usb-ci-vga-mode"
     cat > "$ROOT/etc/profile.d/usb-ci-vga-login.sh" <<'CIEOF'
