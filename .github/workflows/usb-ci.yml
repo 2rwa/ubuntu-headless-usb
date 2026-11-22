@@ -1,0 +1,118 @@
+name: USB builder CI
+on:
+  push:
+    paths:
+      - '.github/workflows/usb-ci.yml'
+      - 'install.sh'
+      - 'lib/**'
+      - 'firstboot-complete.sh'
+      - 'register-runner.sh'
+      - 'config/**'
+      - 'tests/**'
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: 'test depth'
+        type: choice
+        options: [static, image, boot]
+        default: static
+      include_firmware:
+        description: 'Download linux-firmware (large, omit by default)'
+        type: boolean
+        default: false
+      cache_debs:
+        description: 'GitHub Actions apt .deb cache (transfers cache data)'
+        type: boolean
+        default: true
+      login_user:
+        description: 'CI login account to test'
+        type: string
+        default: developer
+      runner_user:
+        description: 'CI Actions account to test'
+        type: string
+        default: buildbot
+permissions:
+  contents: read
+concurrency:
+  group: usb-ci-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+jobs:
+  safety:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax, safety and configurable-user tests
+        run: |
+          bash tests/static-check.sh
+          sudo bash tests/safety-test.sh
+          if command -v shellcheck >/dev/null; then
+            shellcheck -S error install.sh lib/provision.sh firstboot-complete.sh register-runner.sh tests/*.sh
+          fi
+  image:
+    needs: safety
+    if: github.event_name == 'workflow_dispatch' && inputs.level != 'static'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      IMAGE: ${{ runner.temp }}/ubuntu-usb-ci.raw
+      CACHE: ${{ runner.temp }}/ubuntu-usb-apt-cache
+      USB_LOGIN_USER: ${{ inputs.login_user }}
+      USB_RUNNER_USER: ${{ inputs.runner_user }}
+      USB_SKIP_FIRMWARE: ${{ inputs.include_firmware && '0' || '1' }}
+      USB_CI_EXPLICIT: 'yes'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Measure network at start
+        run: bash tests/network-bytes.sh | tee "${{ runner.temp }}/network-start.txt"
+      - name: Host dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends debootstrap gdisk parted dosfstools e2fsprogs qemu-system-x86 ovmf
+      - name: Restore cached .deb packages (optional)
+        if: inputs.cache_debs
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CACHE }}
+          key: noble-amd64-debs-v1-${{ hashFiles('config/packages.txt') }}-${{ inputs.include_firmware && 'withfw' || 'nofw' }}
+      - name: Build and inspect isolated image
+        run: |
+          mkdir -p "$CACHE"
+          if [[ "${{ inputs.cache_debs }}" != "true" ]]; then
+            unset USB_APT_CACHE_DIR
+          else
+            export USB_APT_CACHE_DIR="$CACHE"
+          fi
+          sudo -E bash tests/build-image.sh "$IMAGE"
+          df -h
+      - name: BIOS boot
+        if: inputs.level == 'boot'
+        run: bash tests/qemu-boot.sh bios "$IMAGE" "${{ runner.temp }}/qemu-bios.log"
+      - name: UEFI boot
+        if: inputs.level == 'boot'
+        run: bash tests/qemu-boot.sh uefi "$IMAGE" "${{ runner.temp }}/qemu-uefi.log"
+      - name: Network usage summary
+        if: always()
+        run: |
+          bash tests/network-bytes.sh | tee "${{ runner.temp }}/network-end.txt"
+          echo '## Network byte counters (including Actions cache traffic)' >> "$GITHUB_STEP_SUMMARY"
+          cat "${{ runner.temp }}/network-start.txt" "${{ runner.temp }}/network-end.txt" >> "$GITHUB_STEP_SUMMARY"
+          du -sh "$CACHE" 2>/dev/null || true
+          du -sh "$IMAGE" 2>/dev/null || true
+      - name: Save .deb cache (optional, cache miss only)
+        if: always() && inputs.cache_debs
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CACHE }}
+          key: noble-amd64-debs-v1-${{ hashFiles('config/packages.txt') }}-${{ inputs.include_firmware && 'withfw' || 'nofw' }}
+      - name: Upload boot and measurement logs (never upload disk image)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: usb-ci-logs
+          path: |
+            ${{ runner.temp }}/qemu-*.log
+            ${{ runner.temp }}/network-*.txt
+          if-no-files-found: ignore
