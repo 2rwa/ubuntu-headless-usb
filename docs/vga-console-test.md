@@ -289,3 +289,32 @@ the VGA boot console—not OCR or a replacement for serial boot output.
 
 Boot-frame capture and its stop/ack handshake were independently verified on
 [Actions #44983752506](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44983752506).
+
+
+## 2026-11-22 — CI tty1 success marker corrected after image/serial evidence
+
+The cached minimal run [#44983890046](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44983890046)
+proved the login session actually launched a user bash process (PID 411,
+parent PID 314 root-owned `login`) on tty1 after the PAM password date
+transition. A CI-only /etc/profile.d marker did not fire, so the host
+incorrectly timed out waiting for `USB_CI_VGA_LOGIN_OK`. This is a failure
+of the test harness success detection, **not evidence of failed password
+change or failed user-shell creation**.
+
+The root-owned serial/network watcher now checks a numeric tty1 process
+listing (PID, PPID, UID, comm), requiring the expected login-account UID and
+its configured shell as an immediate child of a root-owned `login` process.
+Only after an independently observed /etc/shadow password-date update does
+it emit `USB_CI_VGA_LOGIN_OK` to serial. The watcher never reads, writes,
+or logs passwords. The redundant /etc/profile.d CI marker is removed.
+
+The reusable checker `tests/guest-tty1-login-check.sh` consumes a
+`ps -t tty1 -o pid=,ppid=,uid=,comm=` listing. A no-VM regression
+`tests/test_tty1_login_check.sh` verifies acceptance of a valid
+login->user-shell pair and rejection of wrong UID, wrong parent, missing
+login, wrong executable and a non-login background shell. CI production
+images do not install these diagnostic scripts.
+
+This test harness change must be followed by an end-to-end minimal image
+run validating actual firstboot, DHCP, SSH, and UEFI. Do not declare them
+verified merely because the tty1 process check passes.

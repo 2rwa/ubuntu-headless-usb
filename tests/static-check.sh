@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
-for script in install.sh lib/provision.sh firstboot-complete.sh register-runner.sh tests/static-check.sh tests/guest-onboard.sh tests/qemu-boot.sh tests/build-image.sh tests/inspect-root.sh tests/safety-test.sh tests/network-bytes.sh tests/guest-network-watch.sh; do
+for script in install.sh lib/provision.sh firstboot-complete.sh register-runner.sh tests/static-check.sh tests/guest-onboard.sh tests/qemu-boot.sh tests/build-image.sh tests/inspect-root.sh tests/safety-test.sh tests/network-bytes.sh tests/guest-network-watch.sh tests/guest-tty1-login-check.sh tests/test_tty1_login_check.sh; do
   bash -n "$here/$script"
 done
 python3 -m py_compile "$here/tests/qemu-vga.py" "$here/tests/qemu-vga-watch.py" "$here/tests/test_vga_watch.py"
@@ -25,13 +25,14 @@ grep -Fq 'LIVE_SERIAL_BEGIN' "$here/tests/qemu-boot.sh"
 grep -Fq 'SECONDS - started < limit' "$here/tests/qemu-boot.sh"
 grep -Fq 'sleep 1' "$here/tests/qemu-boot.sh"
 ! grep -Fq 'for ((i=0; i<limit; i++))' "$here/tests/qemu-boot.sh"
-# Regressions found in the first minimal-image/PAM run:
-# only root's guest network watcher writes ttyS0; host marker names match.
-grep -Fq '.usb-ci-vga-login-ok' "$here/lib/provision.sh"
-grep -Fq '.usb-ci-vga-login-ok' "$here/tests/guest-network-watch.sh"
+# A real tty1 login shell must have the expected UID and a root-owned
+# login(1) process as its direct parent; PAM shadow updates alone do not pass.
+bash "$here/tests/test_tty1_login_check.sh"
+grep -Fq 'usb-ci-tty1-login-check' "$here/lib/provision.sh"
+grep -Fq 'usb-ci-tty1-login-check' "$here/tests/guest-network-watch.sh"
 grep -Fq 'USB_CI_VGA_LOGIN_OK' "$here/tests/guest-network-watch.sh"
 grep -Fq 'USB_CI_NET_PAM_PASSWORD_DATE_UPDATED' "$here/tests/qemu-boot.sh"
-! grep -Fq 'USB_CI_VGA_LOGIN_OK' "$here/lib/provision.sh"
+! grep -Fq 'usb-ci-vga-login.sh' "$here/lib/provision.sh"
 # Cache must be made readable to the non-root archive saver.
 grep -Fq 'sudo chown -R' "$here/.github/workflows/usb-ci.yml"
 grep -Fq 'sudo rm -rf -- "$CACHE/partial"' "$here/.github/workflows/usb-ci.yml"

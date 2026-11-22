@@ -16,17 +16,12 @@ login_pending_reported=0
 pam_change_at=0
 if [[ $vga == 1 ]]; then
   expected_uid=$(id -u "$login")
+  login_shell=$(getent passwd "$login" | awk -F: '{print $7}')
+  login_shell=${login_shell##*/}
+  [[ $login_shell =~ ^[a-zA-Z0-9_.+-]+$ ]] ||
+    { signal FAILED:invalid-login-shell; exit 1; }
 fi
 for ((i=0;i<limit;i++)); do
-  # The root watcher is the only CI component allowed to write ttyS0.
-  if [[ $vga == 1 && $login_reported == 0 ]]; then
-    marker="/home/$login/.usb-ci-vga-login-ok"
-    if [[ -f $marker && ! -L $marker && $(stat -c %u "$marker") == "$expected_uid" ]]; then
-      rm -f -- "$marker"
-      printf 'USB_CI_VGA_LOGIN_OK\n' > /dev/ttyS0
-      login_reported=1
-    fi
-  fi
   [[ ! -f /var/lib/ubuntu-usb/network-enabled ]] || break
   if [[ $vga == 1 && $reported == 0 ]]; then
     last_change=$(awk -F: -v u="$login" '$1==u {print $3}' /etc/shadow)
@@ -36,8 +31,19 @@ for ((i=0;i<limit;i++)); do
       pam_change_at=$SECONDS
     fi
   fi
-  # A PAM password-date transition is not a shell login. If the CI marker
-  # remains missing, print safe tty1 process state to the LIVE serial stream.
+  # A password-date update alone is insufficient. Verify the actual user
+  # shell is an immediate child of a root-owned login(1) process on tty1.
+  # This is CI-only and does not depend on /etc/profile.d being sourced or
+  # on giving a non-root user write access to the serial device.
+  if [[ $vga == 1 && $reported == 1 && $login_reported == 0 ]]; then
+    if ps -t tty1 -o pid=,ppid=,uid=,comm= |
+         /usr/local/sbin/usb-ci-tty1-login-check "$expected_uid" "$login_shell"; then
+      printf 'USB_CI_VGA_LOGIN_OK\n' > /dev/ttyS0
+      login_reported=1
+    fi
+  fi
+  # If the expected login shell is still missing, publish *only* a safe
+  # process summary for diagnosis, never a password or VGA framebuffer.
   if [[ $vga == 1 && $reported == 1 && $login_reported == 0 &&
         $login_pending_reported == 0 ]] && (( SECONDS - pam_change_at >= 10 )); then
     signal LOGIN_MARKER_PENDING

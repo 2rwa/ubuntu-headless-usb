@@ -224,3 +224,15 @@ No conclusions are inferred from a QEMU process merely exiting cleanly.
   plus a separate live ttyS0 stream, and retains the images on failure.
 - Verify the uploaded PNGs depict readable guest boot activity, not simply a
   successful screenshot API call. Password-entry frames must remain unretained.
+
+
+## 2026-11-22 — fix false negative after genuine tty1 login
+
+Evidence from minimal BIOS run #44983890046: PAM's last-change day updated
+and the guest reported root-owned `login` on tty1 with direct child
+`developer` bash. The /etc/profile.d marker did not appear. Therefore the
+previous BIOS failure was the **CI success signal**, not a missing login
+shell. New checker verifies root login PID/child shell UID and command
+and the existing shadow-date transition, then emits the same serial success
+marker. Test exact process-parent/UID cases without building Ubuntu; only
+after safety success launch one cached minimal boot test.

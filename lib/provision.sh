@@ -141,6 +141,7 @@ WantedBy=multi-user.target
 CIEOF
   chroot "$ROOT" systemctl enable ubuntu-usb-ci-onboard.service
   install -m 755 "$HERE/tests/guest-network-watch.sh" "$ROOT/usr/local/sbin/usb-ci-network-watch"
+  install -m 755 "$HERE/tests/guest-tty1-login-check.sh" "$ROOT/usr/local/sbin/usb-ci-tty1-login-check"
   cat > "$ROOT/etc/systemd/system/ubuntu-usb-ci-network-watch.service" <<'CIEOF'
 [Unit]
 Description=USB CI guest DHCP and SSH readiness check
@@ -154,21 +155,9 @@ WantedBy=multi-user.target
 CIEOF
   chroot "$ROOT" systemctl enable ubuntu-usb-ci-network-watch.service
   if [[ ${USB_CI_VGA_LOGIN:-0} == 1 ]]; then
+    # Test-only: a root-owned watcher verifies the real tty1 login -> shell
+    # process relationship. Do not depend on shell startup profile hooks.
     touch "$ROOT/etc/ubuntu-usb-ci-vga-mode"
-    cat > "$ROOT/etc/profile.d/usb-ci-vga-login.sh" <<'CIEOF'
-# CI-only: prove a real login shell has opened on the VGA tty1.
-case "$(tty 2>/dev/null)" in
-  /dev/tty1)
-    login_user=$(sed -n 's/^login_user=//p' /var/lib/ubuntu-usb/identity)
-    if [ "$(id -un)" = "$login_user" ]; then
-      # The login user cannot write root:dialout /dev/ttyS0. Signal through
-      # a private nonsecret home marker; the root CI watcher emits serial.
-      umask 077
-      : > "$HOME/.usb-ci-vga-login-ok"
-    fi
-    ;;
-esac
-CIEOF
   fi
 fi
 chroot "$ROOT" update-initramfs -u -k all
