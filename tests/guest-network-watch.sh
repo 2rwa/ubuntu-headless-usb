@@ -14,6 +14,8 @@ reported=0
 login_reported=0
 login_pending_reported=0
 pam_change_at=0
+login_at=0
+journal_reported=0
 if [[ $vga == 1 ]]; then
   expected_uid=$(id -u "$login")
   login_shell=$(getent passwd "$login" | awk -F: '{print $7}')
@@ -40,6 +42,7 @@ for ((i=0;i<limit;i++)); do
          /usr/local/sbin/usb-ci-tty1-login-check "$expected_uid" "$login_shell"; then
       printf 'USB_CI_VGA_LOGIN_OK\n' > /dev/ttyS0
       login_reported=1
+      login_at=$SECONDS
     fi
   fi
   # If the expected login shell is still missing, publish *only* a safe
@@ -49,6 +52,15 @@ for ((i=0;i<limit;i++)); do
     signal LOGIN_MARKER_PENDING
     ps -t tty1 -o pid,ppid,user,comm --no-headers > /dev/ttyS0 2>&1 || :
     login_pending_reported=1
+  fi
+  # If firstboot still has not enabled networking, capture a bounded,
+  # selected set of root-only journald records *before* the host timeout.
+  # This also distinguishes missing sudo execution from a service failure.
+  if [[ $vga == 1 && $login_reported == 1 && $journal_reported == 0 ]] &&
+     (( SECONDS - login_at >= 12 )); then
+    signal FIRSTBOOT_STILL_PENDING
+    /usr/local/sbin/usb-ci-journal-diagnostics || signal JOURNAL_UNAVAILABLE
+    journal_reported=1
   fi
   sleep 1
 done

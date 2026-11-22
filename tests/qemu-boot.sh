@@ -74,6 +74,11 @@ wait_marker() {
       echo "Observed $marker after $((SECONDS - started))s"
       return 0
     fi
+    if grep -aq 'USB_CI_FIRSTBOOT_FAILED:' "$log" 2>/dev/null; then
+      echo "Guest firstboot program returned failure:" >&2
+      grep -a 'USB_CI_FIRSTBOOT_FAILED:' "$log" >&2
+      return 1
+    fi
     if grep -aq 'USB_CI_NET_FAILED:' "$log" 2>/dev/null; then
       echo "Guest network diagnostic failed:" >&2
       grep -a 'USB_CI_NET_FAILED:' "$log" >&2
@@ -162,6 +167,11 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     python3 tests/qemu-vga.py type "$monitor" 'sudo usb-firstboot-complete'
     sleep 3
     python3 tests/qemu-vga.py type-file "$monitor" "$replacement"
+    # The CI-only wrapper reports whether sudo actually reached the command
+    # and whether it returned successfully; journal diagnostics report why.
+    wait_marker USB_CI_FIRSTBOOT_BEGIN 20
+    wait_marker USB_CI_FIRSTBOOT_OK 40
+    echo 'PASS: sudo firstboot actually started and completed'
     # SSH verifies that the service start and network unmask succeeded.
   else
     wait_marker USB_CI_ONBOARD_OK

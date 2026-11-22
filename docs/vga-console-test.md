@@ -318,3 +318,44 @@ images do not install these diagnostic scripts.
 This test harness change must be followed by an end-to-end minimal image
 run validating actual firstboot, DHCP, SSH, and UEFI. Do not declare them
 verified merely because the tty1 process check passes.
+
+
+
+## 2026-11-22 — Correlate guest journald and firstboot with live ttyS0
+
+Why: Legacy BIOS reached systemd in 26s and the real tty1 shell/forced PAM
+password change passed in [Actions #44987057196](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44987057196).
+However, `USB_CI_NET_READY` never arrived. The physical-USB image uses
+`Storage=volatile` (32 MiB) for journald, so guest logs vanished after the
+CI VM stopped. QEMU `-serial file:` only mirrors ttyS0, not tty1's command
+stdout or journald automatically.
+
+CI-only telemetry added without changing the normal USB boot or login:
+
+- `tests/guest-firstboot-wrapper.sh` wraps the unchanged firstboot script
+  **only in CI**. For a valid login user with a completed forced password
+  change it emits `USB_CI_FIRSTBOOT_BEGIN`, `..._OK`, or `..._FAILED:rc`.
+  Before-password-change refusal checks still call the real script without
+  markers. The wrapper does not print entered passwords or arbitrary tty1
+  stdout/stderr.
+- `tests/guest-journal-diagnostics.sh` is installed in the CI guest only.
+  The root watcher invokes it if onboarding has not completed 12s after a
+  confirmed tty1 shell; the wrapper also invokes it when firstboot fails.
+  It sends a **bounded subset** of `journalctl -b` messages for sudo and
+  the relevant systemd units to /dev/ttyS0, together with tty1 process
+  metadata, service states, and a nonsecret network-marker presence flag.
+  The live serial relay saves this evidence in the Actions log and artifact.
+  Arbitrary user journals, VGA password screens and raw guest disks are not
+  uploaded.
+- The host waits separately for BEGIN (20s), OK (40s), and network READY
+  (60s). A real firstboot failure is an immediate failing condition after
+  the guest has emitted diagnostics; a command that was not executed never
+  produces BEGIN, distinguishing it from a service startup problem.
+- The image workflow now runs a **UEFI boot-and-VGA-only fallback after a
+  failed BIOS integration**, when image creation succeeded. If BIOS completes
+  onboarding successfully, UEFI continues with full SSH/network verification.
+  UEFI is not presented as fully tested by a boot-only pass.
+
+The next expensive integration must verify an actual `USB_CI_JOURNAL_BEGIN`
+from the guest and the firstboot lifecycle markers. Static checks alone
+cannot verify journal delivery or identify the root cause of pending network.

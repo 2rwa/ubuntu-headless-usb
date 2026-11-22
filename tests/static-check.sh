@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
-for script in install.sh lib/provision.sh firstboot-complete.sh register-runner.sh tests/static-check.sh tests/guest-onboard.sh tests/qemu-boot.sh tests/build-image.sh tests/inspect-root.sh tests/safety-test.sh tests/network-bytes.sh tests/guest-network-watch.sh tests/guest-tty1-login-check.sh tests/test_tty1_login_check.sh; do
+for script in install.sh lib/provision.sh firstboot-complete.sh register-runner.sh tests/static-check.sh tests/guest-onboard.sh tests/qemu-boot.sh tests/build-image.sh tests/inspect-root.sh tests/safety-test.sh tests/network-bytes.sh tests/guest-network-watch.sh tests/guest-tty1-login-check.sh tests/test_tty1_login_check.sh tests/guest-firstboot-wrapper.sh tests/guest-journal-diagnostics.sh; do
   bash -n "$here/$script"
 done
 python3 -m py_compile "$here/tests/qemu-vga.py" "$here/tests/qemu-vga-watch.py" "$here/tests/test_vga_watch.py"
@@ -33,6 +33,17 @@ grep -Fq 'usb-ci-tty1-login-check' "$here/tests/guest-network-watch.sh"
 grep -Fq 'USB_CI_VGA_LOGIN_OK' "$here/tests/guest-network-watch.sh"
 grep -Fq 'USB_CI_NET_PAM_PASSWORD_DATE_UPDATED' "$here/tests/qemu-boot.sh"
 ! grep -Fq 'usb-ci-vga-login.sh' "$here/lib/provision.sh"
+# CI-only firstboot wrapper distinguishes command-not-run from service failure.
+grep -Fq 'USB_CI_FIRSTBOOT_BEGIN' "$here/tests/guest-firstboot-wrapper.sh"
+grep -Fq 'USB_CI_FIRSTBOOT_OK' "$here/tests/guest-firstboot-wrapper.sh"
+grep -Fq 'USB_CI_FIRSTBOOT_FAILED:' "$here/tests/guest-firstboot-wrapper.sh"
+grep -Fq 'usb-firstboot-complete.real' "$here/lib/provision.sh"
+grep -Fq 'wait_marker USB_CI_FIRSTBOOT_BEGIN 20' "$here/tests/qemu-boot.sh"
+grep -Fq 'wait_marker USB_CI_FIRSTBOOT_OK 40' "$here/tests/qemu-boot.sh"
+grep -Fq 'usb-ci-journal-diagnostics' "$here/tests/guest-network-watch.sh"
+grep -Fq 'journalctl -b -t sudo' "$here/tests/guest-journal-diagnostics.sh"
+grep -Fq 'journalctl -b -n 55' "$here/tests/guest-journal-diagnostics.sh"
+grep -Fq 'USB_CI_JOURNAL_END' "$here/tests/guest-journal-diagnostics.sh"
 # Cache must be made readable to the non-root archive saver.
 grep -Fq 'sudo chown -R' "$here/.github/workflows/usb-ci.yml"
 grep -Fq 'sudo rm -rf -- "$CACHE/partial"' "$here/.github/workflows/usb-ci.yml"

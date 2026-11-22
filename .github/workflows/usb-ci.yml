@@ -129,6 +129,7 @@ jobs:
           path: ${{ env.CACHE }}
           key: noble-amd64-debs-v2-${{ env.USB_CI_MINIMAL }}-${{ hashFiles('config/packages.txt', 'config/packages-vga.txt') }}-${{ inputs.include_firmware && 'withfw' || 'nofw' }}
       - name: Build and inspect isolated image
+        id: imagebuild
         run: |
           mkdir -p "$CACHE"
           if [[ "$CACHE_ENABLED" != "true" ]]; then
@@ -159,6 +160,7 @@ jobs:
           find "$CACHE" -maxdepth 1 -type f -name '*.deb' | wc -l
           du -sh "$CACHE"
       - name: BIOS boot (live serial, 180s hard limit)
+        id: biosboot
         if: (github.event_name == 'workflow_dispatch' && inputs.level == 'boot') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[boot-ci-once]'))
         run: |
           if timeout --signal=TERM --kill-after=10s 180s bash tests/qemu-boot.sh bios "$IMAGE" "${{ runner.temp }}/qemu-bios.log"; then
@@ -172,8 +174,13 @@ jobs:
             exit "$rc"
           fi
       - name: UEFI boot (live serial, 180s hard limit)
-        if: (github.event_name == 'workflow_dispatch' && inputs.level == 'boot') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[boot-ci-once]'))
+        # Always attempt UEFI once the image was built, even when BIOS/PAM fails.
+        # On a BIOS failure, check UEFI boot+VGA only (no onboarding dependency).
+        if: always() && steps.imagebuild.outcome == 'success' && ((github.event_name == 'workflow_dispatch' && inputs.level == 'boot') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[boot-ci-once]')))
+        env:
+          USB_CI_VERIFY_ONBOARD: ${{ steps.biosboot.outcome == 'success' && '1' || '0' }}
         run: |
+          echo "UEFI verification mode: $([[ $USB_CI_VERIFY_ONBOARD == 1 ]] && echo full-onboarding || echo boot-and-vga-only)"
           if timeout --signal=TERM --kill-after=10s 180s bash tests/qemu-boot.sh uefi "$IMAGE" "${{ runner.temp }}/qemu-uefi.log"; then
             echo "PASS: UEFI QEMU integration completed within 180s"
           else

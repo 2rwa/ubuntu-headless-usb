@@ -142,6 +142,11 @@ CIEOF
   chroot "$ROOT" systemctl enable ubuntu-usb-ci-onboard.service
   install -m 755 "$HERE/tests/guest-network-watch.sh" "$ROOT/usr/local/sbin/usb-ci-network-watch"
   install -m 755 "$HERE/tests/guest-tty1-login-check.sh" "$ROOT/usr/local/sbin/usb-ci-tty1-login-check"
+  install -m 755 "$HERE/tests/guest-journal-diagnostics.sh" "$ROOT/usr/local/sbin/usb-ci-journal-diagnostics"
+  # Wrap the real, unchanged firstboot program ONLY in the CI test image.
+  # The wrapper emits lifecycle markers; interactive stdout remains on VGA tty1.
+  mv "$ROOT/usr/local/sbin/usb-firstboot-complete" "$ROOT/usr/local/sbin/usb-firstboot-complete.real"
+  install -m 755 "$HERE/tests/guest-firstboot-wrapper.sh" "$ROOT/usr/local/sbin/usb-firstboot-complete"
   cat > "$ROOT/etc/systemd/system/ubuntu-usb-ci-network-watch.service" <<'CIEOF'
 [Unit]
 Description=USB CI guest DHCP and SSH readiness check

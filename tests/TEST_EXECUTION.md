@@ -252,3 +252,29 @@ after safety success launch one cached minimal boot test.
 - Retain serial logs and only precredential VGA PNGs, never passwords.
 - Each BIOS or UEFI stage has a 180-second overall limit; the heavy CI job
   retains the 120-minute workflow guard for image building.
+
+
+
+## 2026-11-22 — Serial system journal and independent UEFI smoke
+
+Observed: [BIOS #44987057196](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44987057196)
+passed real tty1 shell + PAM update; failed waiting for USB_CI_NET_READY.
+Production journald uses Storage=volatile, so the guest's runtime journal is
+not recoverable after the VM exits. UART logging alone is not a full journal.
+
+Changes:
+1. CI-only wrapper calls the unchanged real usb-firstboot-complete and
+   reports BEGIN, OK or FAILED via ttyS0, only after valid PAM transition.
+   Ordinary physical USB initialization is untouched.
+2. Root CI watcher exports limited `journalctl -b` records for sudo,
+   ssh/networkd/resolved/Avahi/getty units, plus service and tty1 state,
+   after a 12s pending period. The wrapper also exports it on error.
+3. Host waits separately for command BEGIN/OK before network READY;
+   firstboot errors stop the test with journal evidence in the artifact.
+4. UEFI boot/VGA is attempted after a BIOS integration failure when the
+   disk image exists. Only if BIOS passed is full UEFI network/SSH checked.
+5. Physical USB journal remains volatile (32 MiB). No persistent guest
+   journal is requested and no passwords/raw images are uploaded.
+
+Validate new static checks first; then one cached minimal Ubuntu boot test.
+A full green CI result requires BIOS onboarding+network+SSH and UEFI.
