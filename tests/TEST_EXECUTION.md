@@ -377,3 +377,13 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
   with output discarded. This tests real key readability, not only syntax.
 - Recheck BIOS public-key-only SSH, deny root and runner SSH, and full UEFI
   onboarding/SSH. No full success until these real checks pass.
+
+
+## 2026-11-22 — one-off cached CI after SSH key owner fix
+
+- Static/safety passed in [Actions #45014145909](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/45014145909).
+- A real cached minimal image integration should check that the *runner*
+  can read the CI SSH key with ssh-keygen -y (0600), then complete BIOS
+  login/PAM, firstboot, DHCP, positive public-key SSH and negative root/runner
+  SSH tests, and full UEFI onboarding/SSH. Preserve the 180s per-boot cap.
+- Do not infer success from the preflight alone; real SSH handshake is required.
