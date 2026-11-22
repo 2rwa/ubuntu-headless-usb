@@ -387,3 +387,20 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
   login/PAM, firstboot, DHCP, positive public-key SSH and negative root/runner
   SSH tests, and full UEFI onboarding/SSH. Preserve the 180s per-boot cap.
 - Do not infer success from the preflight alone; real SSH handshake is required.
+
+
+## 2026-11-22 — #45014205440 authentication failure ambiguity
+
+- Host generated private key now passes the actual non-root readability
+  check (ssh-keygen -y). BIOS boots, PAM+firstboot pass, DHCP 10.0.2.15 and
+  guest READY pass. 15 SSH attempts returned nonzero, with no key permission
+  error. The old test ran authentication *and* remote marker/service checks
+  in one compound SSH command with quiet errors, so this does not prove
+  whether SSH authentication failed or remote systemctl assertions failed.
+- Split the verification into: SSH command `id -un` (actual public-key
+  authentication and expected identity), then guest service/marker checks
+  with explicit per-unit success or failure. On authentication failure,
+  restrict debug output to selected transport/key-exchange result messages,
+  not private key material or a full SSH trace. Only five short retries.
+- A green static test does not prove real SSH. Run a cached minimal boot
+  to measure the actual outcome, and recheck full UEFI once BIOS passes.

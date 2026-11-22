@@ -61,6 +61,12 @@ grep -Fq 'chown "$SUDO_UID:$SUDO_GID" "$keybase" "$keybase.pub"' "$here/tests/bu
 grep -Fq 'chmod 0600 "$keybase"' "$here/tests/build-image.sh"
 grep -Fq 'ssh-keygen -y -f "$key" >/dev/null' "$here/.github/workflows/usb-ci.yml"
 grep -Fq 'stat -c %u:%a "$key"' "$here/.github/workflows/usb-ci.yml"
+# Distinguish real SSH public-key authentication from remote assertions.
+grep -Fq 'SSH_AUTH_PROBE' "$here/tests/qemu-boot.sh"
+grep -Fq 'PASS: SSH public-key authentication as expected login user' "$here/tests/qemu-boot.sh"
+grep -Fq 'SSH_REMOTE_FAIL:inactive:' "$here/tests/qemu-boot.sh"
+grep -Fq 'FAIL: SSH transport/public-key authentication failed' "$here/tests/qemu-boot.sh"
+grep -Fq 'FAIL: SSH authenticated but guest network/service assertion failed' "$here/tests/qemu-boot.sh"
 # Cache must be made readable to the non-root archive saver.
 grep -Fq 'sudo chown -R' "$here/.github/workflows/usb-ci.yml"
 grep -Fq 'sudo rm -rf -- "$CACHE/partial"' "$here/.github/workflows/usb-ci.yml"

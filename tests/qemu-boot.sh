@@ -186,15 +186,47 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no
     -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
     -o LogLevel=ERROR -o ConnectTimeout=6 -o ConnectionAttempts=1)
+  # Keep authentication separate from the remote systemd assertions.
+  # The former test silently retried a compound command 15 times: a remote
+  # service test failure looked identical to a rejected SSH public key.
   verified=0
-  for ((i=0;i<15;i++)); do
-    if ssh "${ssh_args[@]}" "$login@127.0.0.1"        'test "$(id -un)" = "$USER" && test -f /var/lib/ubuntu-usb/network-enabled && for unit in ssh.service systemd-networkd.service avahi-daemon.service; do systemctl is-active --quiet "$unit" || exit 1; done'; then
-      verified=1
-      break
-    fi
-    sleep 3
+  for ((i=1;i<=5;i++)); do
+    remote_user=$(ssh "${ssh_args[@]}" "$login@127.0.0.1" 'id -un') && verified=1 || :
+    if [[ $verified == 1 ]]; then break; fi
+    echo "SSH_AUTH_PROBE attempt=$i result=failed"
+    sleep 2
   done
-  [[ $verified == 1 ]] || { echo "Local SSH authentication failed ($mode)" >&2; exit 1; }
+  if [[ $verified != 1 ]]; then
+    echo "FAIL: SSH transport/public-key authentication failed ($mode)" >&2
+    # Only show selected SSH negotiation facts; no private key bytes,
+    # passwords, full ssh -vv transcript or remote user journals.
+    ssh_diag=$(mktemp "${RUNNER_TEMP:?}/ssh-auth-diag.XXXXXXXX")
+    chmod 600 "$ssh_diag"
+    ssh -vv "${ssh_args[@]}" "$login@127.0.0.1" 'true' >/dev/null 2>"$ssh_diag" || :
+    grep -E 'Connection established|connect to address|Authentications that can continue|Offering public key|Server accepts key|Authenticated to|Permission denied|Connection refused|Connection timed out|No route to host|No more authentication methods' "$ssh_diag" >&2 || :
+    rm -f "$ssh_diag"
+    exit 1
+  fi
+  [[ $remote_user == "$login" ]] || {
+    echo "FAIL: SSH authenticated as unexpected user ($mode)" >&2; exit 1;
+  }
+  echo "PASS: SSH public-key authentication as expected login user ($mode)"
+  if ! ssh "${ssh_args[@]}" "$login@127.0.0.1" '
+    test -f /var/lib/ubuntu-usb/network-enabled || {
+      echo "SSH_REMOTE_FAIL:no-onboard-marker"; exit 1;
+    }
+    for unit in ssh.service systemd-networkd.service avahi-daemon.service; do
+      if systemctl is-active --quiet "$unit"; then
+        echo "SSH_REMOTE_UNIT_OK:$unit"
+      else
+        echo "SSH_REMOTE_FAIL:inactive:$unit"; exit 1;
+      fi
+    done
+  '; then
+    echo "FAIL: SSH authenticated but guest network/service assertion failed ($mode)" >&2
+    exit 1
+  fi
+  echo "PASS: remote onboard marker and required guest services ($mode)"
   if ssh "${ssh_args[@]}" "root@127.0.0.1" true >/dev/null 2>&1; then
     echo 'Root SSH login unexpectedly succeeded' >&2
     exit 1
