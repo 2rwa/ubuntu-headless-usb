@@ -2,7 +2,10 @@
 # CI-only diagnostic of real DHCP/address/SSH readiness. Never in physical installs.
 set -Eeuo pipefail
 signal() { printf '%s\n' "USB_CI_NET_$1" > /dev/ttyS0; }
-for ((i=0;i<180;i++)); do
+# Allow slow TCG interactive PAM without preempting host-side diagnosis.
+limit=180
+[[ -f /etc/ubuntu-usb-ci-vga-mode ]] && limit=600
+for ((i=0;i<limit;i++)); do
   [[ ! -f /var/lib/ubuntu-usb/network-enabled ]] || break
   sleep 1
 done

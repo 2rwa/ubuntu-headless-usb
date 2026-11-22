@@ -1,0 +1,22 @@
+# CI-only Ubuntu 24.04 minimal profile for VGA login and SSH
+# Production USB always uses config/packages.txt
+linux-generic
+initramfs-tools
+systemd-sysv
+systemd-resolved
+dbus
+sudo
+passwd
+locales
+tzdata
+grub-pc-bin
+grub-efi-amd64-bin
+grub2-common
+dosfstools
+e2fsprogs
+openssh-server
+avahi-daemon
+libnss-mdns
+ca-certificates
+openssl
+iproute2

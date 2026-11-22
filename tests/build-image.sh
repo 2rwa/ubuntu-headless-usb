@@ -9,6 +9,7 @@ IMAGE=${1:-}
 [[ ! -e $IMAGE && ! -L $IMAGE ]] || { echo 'Image already exists: refusing overwrite' >&2; exit 1; }
 HOST=usb-ci-01 LOGIN_USER=${USB_LOGIN_USER:-developer} RUNNER_USER=${USB_RUNNER_USER:-buildbot}
 LUID=1000 RUID=1001 USB_SKIP_FIRMWARE=${USB_SKIP_FIRMWARE:-1} USB_CI_SERIAL=1
+USB_CI_MINIMAL=${USB_CI_MINIMAL:-0}
 MIRROR='http://archive.ubuntu.com/ubuntu'
 [[ $LOGIN_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ && $RUNNER_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || { echo 'invalid user names' >&2; exit 1; }
 [[ $LOGIN_USER != "$RUNNER_USER" && $LOGIN_USER != root && $RUNNER_USER != root ]] || { echo 'account collision' >&2; exit 1; }
