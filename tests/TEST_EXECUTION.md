@@ -314,3 +314,15 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
 - Next run must assert whether 10.0.2.* DHCP is obtained or why it fails,
   and whether public-key SSH becomes available. Avoid relaxing the actual
   DHCP/network/SSH acceptance criteria merely to turn CI green.
+
+
+## 2026-11-22 — one-off network diagnosis after wait race fix
+
+- New fast/safety test successful: [#45011682762](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/45011682762).
+- Run one minimal Ubuntu image + cached APT packages through BIOS,
+  guest firstboot, DHCP/SSH, then UEFI (boot fallback even after BIOS failure).
+- Expect guest ONBOARD_MARKER_SEEN and either NET_READY or explicit
+  NET_FAILED with early IP/routes/networkctl/journal evidence within the
+  host's 75s window. This test must not bypass DHCP or SSH assertions.
+- Distinguish failure of DHCP itself from a guest/host synchronization race
+  and from SSH not listening. Full success is not assumed in advance.
