@@ -7,6 +7,10 @@ done
 python3 -m py_compile "$here/tests/qemu-vga.py"
 python3 "$here/tests/test_qemu_vga.py"
 bash -n "$here/tests/vga-smoke.sh"
+# Polling timeouts are in seconds; a 45-second login timeout must not become 225.
+grep -Fq 'SECONDS - started < limit' "$here/tests/qemu-boot.sh"
+grep -Fq 'sleep 1' "$here/tests/qemu-boot.sh"
+! grep -Fq 'for ((i=0; i<limit; i++))' "$here/tests/qemu-boot.sh"
 # Regressions found in the first minimal-image/PAM run:
 # only root's guest network watcher writes ttyS0; host marker names match.
 grep -Fq '.usb-ci-vga-login-ok' "$here/lib/provision.sh"

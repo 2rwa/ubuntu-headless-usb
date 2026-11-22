@@ -192,3 +192,16 @@ real tty1/PAM login and SSH remain incomplete in the extended scenario.
   PAM shadow date, tty1 login shell, onboarding, DHCP/SSH and UEFI.
 - These fixes address observed defects from Actions #44976878592; full boot
   success and a subsequent cache HIT are pending integration verification.
+
+
+## 2026-11-22: BIOS-test timeout accounting
+
+The QEMU host runner previously used `wait_marker MARKER 45` with a
+`for (...<45)` loop containing `sleep 5`. The intended 45-second limit
+therefore actually took up to **225 seconds** (plus I/O overhead). This made
+an unsuccessful tty1/PAM test look like a slow BIOS boot. Updated the checker
+to use Bash `SECONDS` for real elapsed wall time, one-second polling, and
+explicit per-marker timing in Actions logs. The already-started workflow
+continues to run the version from its own checkout; the fix affects only
+subsequent runs. Avoid a new expensive image build until the running test's
+actual result and cache-save outcome are available.

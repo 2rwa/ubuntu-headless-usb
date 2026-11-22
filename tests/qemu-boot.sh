@@ -33,9 +33,15 @@ cleanup() {
 }
 trap cleanup EXIT
 wait_marker() {
-  local marker=$1 limit=${2:-180}
-  for ((i=0; i<limit; i++)); do
-    if grep -aq "$marker" "$log" 2>/dev/null; then return 0; fi
+  # The limit is a wall-clock timeout in SECONDS, not a loop iteration
+  # count. The previous 5-second polling made a '45' timeout 225 seconds.
+  local marker=$1 limit=${2:-180} started=$SECONDS
+  echo "Waiting for $marker ($mode, timeout ${limit}s)"
+  while (( SECONDS - started < limit )); do
+    if grep -aq "$marker" "$log" 2>/dev/null; then
+      echo "Observed $marker after $((SECONDS - started))s"
+      return 0
+    fi
     if grep -aq 'USB_CI_NET_FAILED:' "$log" 2>/dev/null; then
       echo "Guest network diagnostic failed:" >&2
       grep -a 'USB_CI_NET_FAILED:' "$log" >&2
@@ -53,9 +59,9 @@ wait_marker() {
       cat "$log.qemu-stderr" >&2 || :
       return 1
     fi
-    sleep 5
+    sleep 1
   done
-  echo "Timed out waiting for $marker ($mode)" >&2
+  echo "Timed out waiting for $marker after $((SECONDS - started))s ($mode)" >&2
   tail -c 6000 "$log" >&2 || :
   cat "$log.qemu-stderr" >&2 || :
   return 1
