@@ -5,6 +5,7 @@ for script in install.sh lib/provision.sh firstboot-complete.sh register-runner.
   bash -n "$here/$script"
 done
 python3 -m py_compile "$here/tests/qemu-vga.py"
+python3 "$here/tests/test_qemu_vga.py"
 bash "$here/install.sh" --help | grep -q -- '--apply'
 bash "$here/register-runner.sh" --help | grep -q -- '--url'
 # systemd-networkd comes from systemd on Ubuntu 24.04, no standalone package
