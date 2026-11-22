@@ -145,6 +145,7 @@ ExecStart=/usr/local/sbin/usb-ci-onboard-verify
 WantedBy=multi-user.target
 CIEOF
   chroot "$ROOT" systemctl enable ubuntu-usb-ci-onboard.service
+  install -m 755 "$HERE/tests/guest-dev-smoke.sh" "$ROOT/usr/local/sbin/usb-ci-dev-smoke"
   install -m 755 "$HERE/tests/guest-network-watch.sh" "$ROOT/usr/local/sbin/usb-ci-network-watch"
   install -m 755 "$HERE/tests/guest-tty1-login-check.sh" "$ROOT/usr/local/sbin/usb-ci-tty1-login-check"
   install -m 755 "$HERE/tests/guest-journal-diagnostics.sh" "$ROOT/usr/local/sbin/usb-ci-journal-diagnostics"

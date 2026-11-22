@@ -107,6 +107,9 @@ real-machine testing. The real PAM interaction *was* verified under QEMU.
   A one-off push with `[full-boot-ci-once]` also explicitly triggers this
   full profile (without firmware by default). The job checks developer-tool
   runtimes both in the generated root filesystem and after an actual SSH login.
+  The CI-only SSH test additionally compiles and executes C and C++ using
+  CMake/Ninja, creates a Python virtual environment, and exercises Node.js,
+  npm, jq and rsync. This script is not installed on physical USB media.
   Expect a larger download and cache miss on first use; no physical disks
   are written in CI.
 - **Archive cache**: heavy tests can restore/save only `.deb` files using

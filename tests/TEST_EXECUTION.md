@@ -512,3 +512,23 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
   on both BIOS and UEFI, while preserving PAM, DHCP and denied-login tests.
 - This does NOT claim firmware-inclusive real hardware support. A later
   real USB test is required to verify that and physical drive reliability.
+
+
+## 2026-11-22 — Full Ubuntu passed; add *functional* developer tool test
+
+- [Actions #45024157748](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/45024157748)
+  completed SUCCESS: full Ubuntu development package profile built and
+  inspected, BIOS and UEFI booted, real BIOS PAM password change, DHCP,
+  public-key SSH, service assertions and denied root/runner SSH access.
+  Both paths reported all gcc/g++/make/CMake/Ninja/Git/Python/Node/npm/jq/
+  rsync tools present. Full .deb archive cache saved successfully (first
+  attempt had a cache miss). Firmware package remained excluded.
+- Improve tests from "commands exist/version" to executable behavior:
+  a disposable, CI-only, unprivileged SSH guest script builds/runs C and C++
+  with CMake+Ninja under -Wall/-Wextra/-Werror; creates a Python venv,
+  checks Python pip, runs Node/npm, jq JSON parsing and rsync file copy.
+  All temporary files live in a mktemp directory cleaned on EXIT.
+- The helper refuses non-CI or root invocation and is never installed on
+  physical USB media. Use a bounded 45s guest timeout within the overall
+  180s per firmware boot cap. Do not claim developer compilation passes
+  until an actual full QEMU image run verifies both BIOS and UEFI.

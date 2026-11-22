@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
-for script in install.sh lib/provision.sh firstboot-complete.sh register-runner.sh tests/static-check.sh tests/guest-onboard.sh tests/qemu-boot.sh tests/build-image.sh tests/inspect-root.sh tests/safety-test.sh tests/network-bytes.sh tests/guest-network-watch.sh tests/guest-tty1-login-check.sh tests/test_tty1_login_check.sh tests/guest-firstboot-wrapper.sh tests/guest-journal-diagnostics.sh; do
+for script in install.sh lib/provision.sh firstboot-complete.sh register-runner.sh tests/static-check.sh tests/guest-onboard.sh tests/qemu-boot.sh tests/build-image.sh tests/inspect-root.sh tests/safety-test.sh tests/network-bytes.sh tests/guest-network-watch.sh tests/guest-tty1-login-check.sh tests/test_tty1_login_check.sh tests/guest-firstboot-wrapper.sh tests/guest-journal-diagnostics.sh tests/guest-dev-smoke.sh; do
   bash -n "$here/$script"
 done
 python3 -m py_compile "$here/tests/qemu-vga.py" "$here/tests/qemu-vga-watch.py" "$here/tests/test_vga_watch.py"
@@ -83,8 +83,17 @@ grep -Fq 'SSH_REMOTE_UNIT_OK:' "$here/tests/qemu-boot.sh"
 # Full-profile integration must exercise developer runtimes in the built
 # image and over unprivileged SSH. Push trigger remains explicitly opt-in.
 grep -Fq 'full developer image tools present and runtimes usable' "$here/tests/inspect-root.sh"
-grep -Fq 'USB_CI_DEV_RUNTIMES_OK' "$here/tests/qemu-boot.sh"
-grep -Fq 'USB_CI_DEV_TOOL_MISSING:' "$here/tests/qemu-boot.sh"
+grep -Fq 'USB_CI_DEV_SMOKE_OK' "$here/tests/guest-dev-smoke.sh"
+grep -Fq 'USB_CI_DEV_COMPILERS_OK' "$here/tests/guest-dev-smoke.sh"
+grep -Fq 'USB_CI_DEV_PYTHON_VENV_OK' "$here/tests/guest-dev-smoke.sh"
+grep -Fq 'cmake --build "$work/build"' "$here/tests/guest-dev-smoke.sh"
+grep -Fq 'ssh_args[@]' "$here/tests/qemu-boot.sh"
+grep -Fq 'usb-ci-dev-smoke' "$here/tests/qemu-boot.sh"
+grep -Fq 'usb-ci-dev-smoke' "$here/lib/provision.sh"
+# This helper must refuse to run outside the disposable guest (no host writes).
+if bash "$here/tests/guest-dev-smoke.sh" >/dev/null 2>&1; then
+  echo 'ERROR: guest developer smoke script ran on host' >&2; exit 1
+fi
 grep -Fq "[full-boot-ci-once]" "$here/.github/workflows/usb-ci.yml"
 grep -Fq "USB_CI_MINIMAL: " "$here/.github/workflows/usb-ci.yml"
 # Cache must be made readable to the non-root archive saver.

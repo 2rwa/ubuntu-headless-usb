@@ -35,6 +35,8 @@ compgen -G "$root/boot/initrd.img-*" >/dev/null || fail 'missing initramfs'
 [[ -f $root/etc/systemd/system/ubuntu-usb-ci-onboard.service ]] || fail 'CI onboarding service missing'
 echo 'PASS: boot files, accounts, network masks, identity, and UUIDs'
 if [[ ${USB_CI_MINIMAL:-0} != 1 ]]; then
+  [[ -x $root/usr/local/sbin/usb-ci-dev-smoke ]] ||
+    fail 'CI developer runtime smoke tester missing'
   # Inspect actual binaries in the generated FULL developer image, not host.
   # The minimal VGA profile deliberately excludes these build tools.
   for tool in gcc g++ make cmake ninja git python3 node npm jq rsync; do
