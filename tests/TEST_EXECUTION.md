@@ -343,3 +343,16 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
   guest diagnostics print the effective mode and full networkctl status.
 - Next run must verify a real 10.0.2.* DHCP lease, local forwarded SSH,
   and full UEFI boot/SSH rather than merely a green static check.
+
+
+## 2026-11-22 — one-off minimal boot validation after .network permission fix
+
+- Static/safety workflow [#45013222992](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/45013222992) passed.
+- Previous CI binary image's Ethernet file was created under a 0077 umask;
+  provisioning now sets its readable mode to 0644. The root inspector now
+  fails if the generated file isn't 0644, or lacks Name=en* eth*/DHCP=yes.
+- Run exactly one cached minimal Ubuntu BIOS→PAM→firstboot→DHCP→SSH and
+  UEFI integration. Read serial/networkctl diagnostics and cache hit status.
+- Confirm the real guest reports enp0s2 as managed, with a 10.0.2.* lease
+  and successful public-key SSH before claiming DHCP/SSH fixed.
+- If BIOS fails, still collect independent UEFI boot/VGA evidence.
