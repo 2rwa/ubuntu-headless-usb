@@ -80,3 +80,13 @@ activates tty1. Recheck with cheap unit tests before another full-image run.
   keyboard/PAM interaction as unresolved.
 - A temporary syntax issue from editing the minimal profile was diagnosed by
   the cheap safety checks and fixed before rerunning any full image build.
+
+## 2026-11-22 verified VGA smoke baseline
+
+- [Actions #44974698044](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44974698044): **success**.
+- `safety`: success. `vga`: success. `image`: skipped by design.
+- SeaBIOS framebuffer: 720x400, exactly 2 colors, 7050 nonbackground pixels.
+- QEMU apt packages: 16.2 MB fetched, 82.9 MB installed; host traffic is
+  not fully measured in this tier.
+- Ubuntu tty1/PAM/SSH was not exercised by this smoke; next integration test
+  should select the new CI minimal profile, with .deb archive cache enabled.

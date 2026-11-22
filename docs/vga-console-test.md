@@ -114,3 +114,23 @@ only after the console flow is fixed.
 Archive-only Actions cache is available for repeated minimal/full builds;
 report transfer cost as well as saved download volume. Cache contains no
 root filesystem, credentials or private keys.
+
+## Verified lightweight VGA smoke result — 2026-11-22
+
+[GitHub Actions #44974698044](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44974698044) **passed**.
+Ubuntu image building was skipped completely. QEMU SeaBIOS used its own
+firmware, and the HMP monitor captured a visible two-color VGA framebuffer:
+
+- Framebuffer: **720 × 400**, 2 colors, 7,050 minority pixels.
+- Monitor keyboard command accepted; does **not** prove keyboard input into
+  Ubuntu/PAM (that remains a separate minimal-image integration test).
+- QEMU host packages downloaded: **16.2 MB** per apt output, installed disk
+  footprint **82.9 MB**; apt-index transfer and runner traffic not included.
+- This is dramatically smaller than the earlier roughly **1.14 GiB** full
+  Ubuntu image run. The exact ratio varies with mirror/cache state.
+- Screenshot/diagnostics: [Actions #44974698044 artifact](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44974698044).
+
+Next expensive run should use the **CI-only minimal Ubuntu profile** with
+archive caching. Do not rerun the full development-package profile solely
+to troubleshoot VGA. BIOS and UEFI OS boot were already proven by #44969403610;
+real tty1/PAM login and SSH remain incomplete in the extended scenario.
