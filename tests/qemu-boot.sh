@@ -63,7 +63,7 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     -o LogLevel=ERROR -o ConnectTimeout=6 -o ConnectionAttempts=1)
   verified=0
   for ((i=0;i<15;i++)); do
-    if ssh "${ssh_args[@]}" "$login@127.0.0.1"        'test "$(id -un)" = "$USER" && systemctl is-active --quiet ssh.service systemd-networkd.service avahi-daemon.service && test -f /var/lib/ubuntu-usb/network-enabled'; then
+    if ssh "${ssh_args[@]}" "$login@127.0.0.1"        'test "$(id -un)" = "$USER" && test -f /var/lib/ubuntu-usb/network-enabled && for unit in ssh.service systemd-networkd.service avahi-daemon.service; do systemctl is-active --quiet "$unit" || exit 1; done'; then
       verified=1
       break
     fi
