@@ -170,7 +170,9 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     # The CI-only wrapper reports whether sudo actually reached the command
     # and whether it returned successfully; journal diagnostics report why.
     wait_marker USB_CI_FIRSTBOOT_BEGIN 20
-    wait_marker USB_CI_FIRSTBOOT_OK 40
+    # Under TCG the five systemctl transitions vary by >20s between runs.
+    # Retain the overall 180s cap; stage timings identify real stalls.
+    wait_marker USB_CI_FIRSTBOOT_OK 55
     echo 'PASS: sudo firstboot actually started and completed'
     # SSH verifies that the service start and network unmask succeeded.
   else

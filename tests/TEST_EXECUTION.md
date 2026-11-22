@@ -415,3 +415,21 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
   per-service checks, preserve root/runner login denials, and run full UEFI
   onboarding if BIOS succeeds. Keep 180s per-firmware hard caps.
 - A successful local key-read preflight is not an SSH handshake result.
+
+
+## 2026-11-22 — firstboot TCG timing variation #45016787335
+
+- BIOS systemd and the actual tty1 PAM password change completed; CI observed
+  FIRSTBOOT_BEGIN but the fixed 40s wait expired while SSH was starting.
+  Previous cached runs had firstboot complete in 22–36s, so a fixed 40s
+  limit is too narrow for the measured TCG variation. SSH verification was
+  **not reached** in this run, despite the earlier SSH diagnostic code.
+- Record every security-sensitive *stage name and timing only* for host keys,
+  sshd preflight, unmask, resolved, networkd, SSH, and Avahi. On all physical
+  installs the CI-only marker file is absent, so no serial diagnostics run.
+  Do not dump passwords, keys, raw tty1 content or SSH debug traces.
+- Raise firstboot host marker deadline to 55s but retain the 180s overall
+  per-firmware QEMU timeout. The new markers must show which systemctl stage
+  consumes the elapsed time; don't label a 40s deadline as a systemd failure.
+- Execute safety tests first; run exactly one opt-in cached minimal Ubuntu
+  integration for BIOS DHCP/SSH then UEFI fallback/full verification.

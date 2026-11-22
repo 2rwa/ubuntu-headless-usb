@@ -11,16 +11,32 @@ lastchange=$(awk -F: -v u="$LOGIN_USER" '$1==u {print $3}' /etc/shadow)
 [[ $lastchange =~ ^[1-9][0-9]*$ ]] || {
   echo "$LOGIN_USER must change the initial password locally before networking is enabled" >&2; exit 1;
 }
-ssh-keygen -A
-install -d -m 755 /run/sshd
-/usr/sbin/sshd -t
-systemctl unmask systemd-networkd.service systemd-networkd.socket \
+# Emit bounded, nonsecret timings on ttyS0 only in disposable CI images.
+# Physical USB media have no /etc/ubuntu-usb-ci-vga-mode flag, so their
+# firstboot sequence and interactive stdout/stderr remain unchanged.
+firstboot_step() {
+  local name=$1 started=$SECONDS rc=0
+  shift
+  if [[ -f /etc/ubuntu-usb-ci-vga-mode ]]; then
+    printf 'USB_CI_FIRSTBOOT_STAGE_BEGIN:%s\n' "$name" > /dev/ttyS0 || :
+  fi
+  "$@" || rc=$?
+  if [[ -f /etc/ubuntu-usb-ci-vga-mode ]]; then
+    printf 'USB_CI_FIRSTBOOT_STAGE_END:%s rc=%d elapsed_s=%d\n' \
+      "$name" "$rc" "$((SECONDS - started))" > /dev/ttyS0 || :
+  fi
+  return "$rc"
+}
+firstboot_step hostkey_generation ssh-keygen -A
+firstboot_step ssh_runtime_directory install -d -m 755 /run/sshd
+firstboot_step ssh_config_check /usr/sbin/sshd -t
+firstboot_step unmask_services systemctl unmask systemd-networkd.service systemd-networkd.socket \
   systemd-resolved.service ssh.service ssh.socket avahi-daemon.service avahi-daemon.socket
-systemctl enable --now systemd-resolved.service
-systemctl enable --now systemd-networkd.service
-systemctl disable --now ssh.socket 2>/dev/null || true
-systemctl enable --now ssh.service
-systemctl enable --now avahi-daemon.service
+firstboot_step resolved_enable systemctl enable --now systemd-resolved.service
+firstboot_step networkd_enable systemctl enable --now systemd-networkd.service
+firstboot_step ssh_socket_disable systemctl disable --now ssh.socket 2>/dev/null || true
+firstboot_step ssh_enable systemctl enable --now ssh.service
+firstboot_step avahi_enable systemctl enable --now avahi-daemon.service
 install -d -m 700 /var/lib/ubuntu-usb
 date -u +%FT%TZ > /var/lib/ubuntu-usb/network-enabled
 chmod 600 /var/lib/ubuntu-usb/network-enabled
