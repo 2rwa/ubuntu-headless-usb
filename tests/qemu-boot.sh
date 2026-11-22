@@ -6,10 +6,13 @@ mode=${1:?mode} image=${2:?image} log=${3:?log}
 # QEMU user networking is restricted from the internet; host SSH port forwarding is local only.
 port=22289
 cmd=(qemu-system-x86_64 -machine q35,accel=tcg -m 2048 -smp 2 -display none
-  -monitor none -serial "file:$log"
+  -monitor "unix:${RUNNER_TEMP:?}/qemu-$mode.monitor,server=on,wait=off"
+  -vga std -serial "file:$log"
   -netdev "user,id=usbci,restrict=on,hostfwd=tcp:127.0.0.1:$port-:22"
   -device virtio-net-pci,netdev=usbci -drive "file=$image,format=raw,if=virtio")
 scratch=''
+monitor="${RUNNER_TEMP:?}/qemu-$mode.monitor"
+[[ ! -e $monitor ]] || { echo "QEMU monitor socket collision" >&2; exit 1; }
 if [[ $mode == uefi ]]; then
   code=/usr/share/OVMF/OVMF_CODE_4M.fd
   vars=/usr/share/OVMF/OVMF_VARS_4M.fd
@@ -26,6 +29,7 @@ cleanup() {
   kill "$pid" 2>/dev/null || :
   wait "$pid" 2>/dev/null || :
   [[ -z $scratch ]] || rm -f "$scratch"
+  rm -f "$monitor"
 }
 trap cleanup EXIT
 wait_marker() {
@@ -52,8 +56,39 @@ wait_marker() {
 }
 wait_marker USB_CI_BOOT_OK
 echo "PASS: QEMU $mode reached systemd multi-user"
+# Capture a real VGA text-mode framebuffer, even on a headless Actions runner.
+sleep 4
+python3 tests/qemu-vga.py enter "$monitor"
+sleep 2
+python3 tests/qemu-vga.py capture "$monitor" "${RUNNER_TEMP:?}/qemu-$mode-vga-before.png"
 if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
-  wait_marker USB_CI_ONBOARD_OK
+  if [[ $mode == bios && ${USB_CI_VGA_LOGIN:-0} == 1 ]]; then
+    wait_marker USB_CI_PRE_ONBOARD_LOCK_OK 60
+    initial="${RUNNER_TEMP:?}/usb-ci-initial-password"
+    replacement="${RUNNER_TEMP:?}/usb-ci-next-password"
+    [[ -s $initial && ! -e $replacement ]] || { echo 'CI password file missing or reused' >&2; exit 1; }
+    umask 077
+    openssl rand -hex 12 > "$replacement"
+    # Authenticate on the emulated VGA tty1 and complete the genuine PAM
+    # password-expiry conversation, not a chage simulation.
+    python3 tests/qemu-vga.py type "$monitor" "${USB_LOGIN_USER:-developer}"
+    sleep 3
+    python3 tests/qemu-vga.py type-file "$monitor" "$initial"
+    sleep 3
+    python3 tests/qemu-vga.py type-file "$monitor" "$initial"
+    sleep 3
+    python3 tests/qemu-vga.py type-file "$monitor" "$replacement"
+    sleep 3
+    python3 tests/qemu-vga.py type-file "$monitor" "$replacement"
+    wait_marker USB_CI_VGA_LOGIN_OK 45
+    echo 'PASS: real VGA tty1 login and forced PAM password change'
+    python3 tests/qemu-vga.py type "$monitor" 'sudo usb-firstboot-complete'
+    sleep 3
+    python3 tests/qemu-vga.py type-file "$monitor" "$replacement"
+    # SSH verifies that the service start and network unmask succeeded.
+  else
+    wait_marker USB_CI_ONBOARD_OK
+  fi
   key="${RUNNER_TEMP:?}/usb-ci-ssh-key"
   [[ -s $key ]] || { echo 'CI private SSH key missing' >&2; exit 1; }
   login=${USB_LOGIN_USER:-developer}
@@ -79,4 +114,5 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     exit 1
   fi
   echo "PASS: QEMU $mode onboarding, network services and public-key-only SSH"
+  python3 tests/qemu-vga.py capture "$monitor" "${RUNNER_TEMP:?}/qemu-$mode-vga-after.png"
 fi
