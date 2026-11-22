@@ -273,7 +273,7 @@ frames (approximately 2-second polling) in `qemu-bios-boot-frames/` or
 and `VGA_OBSERVER SNAPSHOT` lines in the live Actions log include the same
 frame and timestamp. The full `ttyS0` stream remains independently logged.
 
-**Security boundary:** Before any emulated keyboard input, the host creates a
+**Security boundary:** Before any simulated username or password entry, the host creates a
 snapshot-stop file and waits for the observer's explicit acknowledgment. The
 observer checks both before and after each QEMU screendump, so no PNG is
 written after stop or while a password could be in flight. VGA monitoring
@@ -286,3 +286,6 @@ and that **no further PNGs appear after the stop acknowledgment**, while a
 separate HMP socket sends keyboard events. Both the PNG series and its
 observer log are uploaded as an Actions artifact. This is an image record of
 the VGA boot console—not OCR or a replacement for serial boot output.
+
+Boot-frame capture and its stop/ack handshake were independently verified on
+[Actions #44983752506](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44983752506).

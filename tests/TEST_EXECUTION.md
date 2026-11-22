@@ -210,3 +210,17 @@ No conclusions are inferred from a QEMU process merely exiting cleanly.
 - Run the no-Ubuntu QEMU smoke before any minimal-image boot; it checks PNG
   presence, simultaneous keyboard/observer operation, and no new PNG after
   stopping. Upload saved boot frames as a diagnostic artifact on failure.
+
+
+## 2026-11-22 boot-frame capture smoke verified and integration dispatch
+
+- [Actions #44983752506](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44983752506):
+  no-Ubuntu QEMU test PASS. A timestamped boot PNG was captured, the
+  screenshot disable/ACK barrier completed, and nine VGA samples continued
+  while separate keyboard/screenshot HMP commands ran. PNG count did not
+  increase after ACK. Syntax/safety checks also PASS.
+- The next opt-in CI run uses the cached minimal Ubuntu configuration and
+  exercises real BIOS boot with a bounded, time-aligned VGA boot-image series
+  plus a separate live ttyS0 stream, and retains the images on failure.
+- Verify the uploaded PNGs depict readable guest boot activity, not simply a
+  successful screenshot API call. Password-entry frames must remain unretained.
