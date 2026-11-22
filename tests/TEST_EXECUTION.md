@@ -404,3 +404,14 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
   not private key material or a full SSH trace. Only five short retries.
 - A green static test does not prove real SSH. Run a cached minimal boot
   to measure the actual outcome, and recheck full UEFI once BIOS passes.
+
+
+## 2026-11-22 — one-shot CI after SSH stage separation
+
+- Static/safety verification passed in Actions #45016709142.
+- One cached minimal Ubuntu integration is required. Specifically verify
+  whether authenticated SSH `id -un` returns expected login user or the
+  client reports transport/public-key failure; only then execute remote
+  per-service checks, preserve root/runner login denials, and run full UEFI
+  onboarding if BIOS succeeds. Keep 180s per-firmware hard caps.
+- A successful local key-read preflight is not an SSH handshake result.
