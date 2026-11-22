@@ -232,6 +232,29 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     exit 1
   fi
   echo "PASS: root-watcher onboard marker and unprivileged remote service checks ($mode)"
+  if [[ ${USB_CI_MINIMAL:-0} != 1 ]]; then
+    # Test usable developer tools through the real SSH login, not just
+    # package metadata in the build chroot.
+    if ! ssh "${ssh_args[@]}" "$login@127.0.0.1" '
+      set -eu
+      for tool in gcc g++ make cmake ninja git python3 node npm jq rsync; do
+        if command -v "$tool" >/dev/null 2>&1; then
+          echo "USB_CI_DEV_TOOL_OK:$tool"
+        else
+          echo "USB_CI_DEV_TOOL_MISSING:$tool"; exit 1
+        fi
+      done
+      python3 -c "import ssl, sqlite3; assert 3 * 7 == 21"
+      node -e "if (2+2 !== 4) process.exit(1)"
+      gcc --version >/dev/null
+      npm --version >/dev/null
+      echo "USB_CI_DEV_RUNTIMES_OK"
+    '; then
+      echo "FAIL: full developer profile tools unavailable through SSH ($mode)" >&2
+      exit 1
+    fi
+    echo "PASS: full developer tools available through SSH ($mode)"
+  fi
   if ssh "${ssh_args[@]}" "root@127.0.0.1" true >/dev/null 2>&1; then
     echo 'Root SSH login unexpectedly succeeded' >&2
     exit 1

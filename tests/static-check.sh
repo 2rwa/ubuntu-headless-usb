@@ -80,6 +80,13 @@ grep -Fq 'wait_marker USB_CI_NET_ONBOARD_MARKER_SEEN 5' "$here/tests/qemu-boot.s
 grep -Fq 'SSH_REMOTE_UNIT_OK:' "$here/tests/qemu-boot.sh"
 # No password-stage screenshot, even after a successful remote SSH test.
 ! grep -Fq 'qemu-$mode-vga-after.png' "$here/tests/qemu-boot.sh"
+# Full-profile integration must exercise developer runtimes in the built
+# image and over unprivileged SSH. Push trigger remains explicitly opt-in.
+grep -Fq 'full developer image tools present and runtimes usable' "$here/tests/inspect-root.sh"
+grep -Fq 'USB_CI_DEV_RUNTIMES_OK' "$here/tests/qemu-boot.sh"
+grep -Fq 'USB_CI_DEV_TOOL_MISSING:' "$here/tests/qemu-boot.sh"
+grep -Fq "[full-boot-ci-once]" "$here/.github/workflows/usb-ci.yml"
+grep -Fq "USB_CI_MINIMAL: " "$here/.github/workflows/usb-ci.yml"
 # Cache must be made readable to the non-root archive saver.
 grep -Fq 'sudo chown -R' "$here/.github/workflows/usb-ci.yml"
 grep -Fq 'sudo rm -rf -- "$CACHE/partial"' "$here/.github/workflows/usb-ci.yml"

@@ -34,3 +34,20 @@ compgen -G "$root/boot/initrd.img-*" >/dev/null || fail 'missing initramfs'
 [[ -f $root/usr/local/sbin/usb-ci-onboard-verify ]] || fail 'CI onboarding tester missing'
 [[ -f $root/etc/systemd/system/ubuntu-usb-ci-onboard.service ]] || fail 'CI onboarding service missing'
 echo 'PASS: boot files, accounts, network masks, identity, and UUIDs'
+if [[ ${USB_CI_MINIMAL:-0} != 1 ]]; then
+  # Inspect actual binaries in the generated FULL developer image, not host.
+  # The minimal VGA profile deliberately excludes these build tools.
+  for tool in gcc g++ make cmake ninja git python3 node npm jq rsync; do
+    chroot "$root" /bin/sh -c "command -v $tool" >/dev/null ||
+      fail "full image missing $tool"
+  done
+  chroot "$root" /usr/bin/python3 -c 'import ssl, sqlite3; assert (2+3)==5' ||
+    fail 'full image Python runtime failed'
+  chroot "$root" /usr/bin/node -e 'if (process.version[0] !== "v") process.exit(1)' ||
+    fail 'full image Node runtime failed'
+  chroot "$root" /usr/bin/gcc --version >/dev/null ||
+    fail 'full image GCC cannot execute'
+  chroot "$root" /usr/bin/npm --version >/dev/null ||
+    fail 'full image npm cannot execute'
+  echo 'PASS: full developer image tools present and runtimes usable'
+fi

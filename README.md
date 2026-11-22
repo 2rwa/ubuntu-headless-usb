@@ -73,18 +73,22 @@ desktop environment), inject virtual keyboard events, and test forced first
 login/password change via tty1. See [VGA test documentation](docs/vga-console-test.md).
 This is an opt-in heavyweight test; push/PR runs only cheap checks.
 
-The boot job also verifies the initial network/SSH lock, expected refusal of
-premature onboarding and runner registration, a **simulated** successful local
-password-change date update, firstboot service activation, public-key SSH
-login, root/runner SSH denial, and idempotent repeated completion. The
-interactive PAM password-change dialogue is **not** tested by this simulation.
+The minimal-image QEMU boot job now verifies the initial network/SSH lock,
+expected refusal of premature onboarding and runner registration, and the
+**real VGA tty1 PAM forced-password-change dialogue** on BIOS. It then runs
+the actual firstboot program, checks DHCP, root-owned onboard markers,
+public-key SSH login, remote network/SSH/Avahi service state, and root/runner
+SSH denial on both BIOS and UEFI (the UEFI run uses a preinitialized image).
+A noninteractive CI-only onboarding check still covers the separate simulated
+password-date transition.
 CI-only guest test services are not installed by the physical USB builder.
 QEMU user networking is restricted from external internet access. A private
 test SSH key remains solely on the CI runner for boot tests and is deleted
 before the job finishes; it is never uploaded as an artifact.
 
-Actual USB boot behavior, physical USB endurance, real LAN multicast/mDNS,
-interactive PAM password change and Secure Boot require separate real-machine testing.
+Actual physical USB boot behavior, flash endurance, real LAN multicast/mDNS,
+hardware-console PAM interaction and Secure Boot still require separate
+real-machine testing. The real PAM interaction *was* verified under QEMU.
 
 ## Bandwidth-conscious CI tiers (2026-11-22)
 
@@ -100,6 +104,11 @@ interactive PAM password change and Secure Boot require separate real-machine te
   compilers. It verifies the real Ubuntu login/firstboot stack.
 - **Full Ubuntu**: choose `minimal_image=false` for end-to-end validation of
   the actual development-tool profile, configured in `config/packages.txt`.
+  A one-off push with `[full-boot-ci-once]` also explicitly triggers this
+  full profile (without firmware by default). The job checks developer-tool
+  runtimes both in the generated root filesystem and after an actual SSH login.
+  Expect a larger download and cache miss on first use; no physical disks
+  are written in CI.
 - **Archive cache**: heavy tests can restore/save only `.deb` files using
   Actions Cache, with separate keys for minimal/full profiles. It **never**
   caches the raw disk image, test SSH keys, or temporary passwords. First-time

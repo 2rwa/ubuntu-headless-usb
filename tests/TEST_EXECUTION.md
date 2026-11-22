@@ -475,3 +475,23 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
   root and runner SSH denials, then full UEFI boot/SSH verification.
 - Strict private marker permissions and pre-credential-only VGA screenshots
   remain enforced. Do not assert success without the real SSH commands.
+
+
+## 2026-11-22 — minimal BIOS + UEFI integration fully passed
+
+- [Actions #45019347866](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/45019347866)
+  completed SUCCESS in both safety and image jobs. Both BIOS and UEFI passed
+  multi-user boot, VGA framebuffer, DHCP, root-owned onboard marker, real
+  public-key SSH authentication, unprivileged remote network/SSH/Avahi service
+  assertions, and negative root/service-account SSH login tests.
+- BIOS also passed real typed tty1 login + PAM forced password change,
+  `sudo usb-firstboot-complete`, and firstboot stage timings (24s total).
+  UEFI tested full SSH onboarding on the *preinitialized* disk image; it did
+  not independently repeat the forced PAM password-change dialogue.
+- Actual USB hardware, Secure Boot, real LAN mDNS, and the complete developer
+  tool profile still require separate testing. No credentials/raw image
+  uploaded; visual snapshots were stopped before entering secrets.
+- The next test is ONE opt-in full-profile build/boot (without the very large
+  linux-firmware package initially). Assert gcc/g++/make/CMake/Ninja/Git/
+  Python/Node/npm/jq/rsync in the generated image AND via actual SSH under
+  both BIOS and UEFI. Maintain all minimal image security assertions.
