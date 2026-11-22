@@ -80,6 +80,9 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     # password-expiry conversation, not a chage simulation.
     python3 tests/qemu-vga.py type "$monitor" "${USB_LOGIN_USER:-developer}"
     sleep 3
+    # Capture only after the username, before typing any secret.
+    # Later password-stage screens are deliberately never uploaded.
+    python3 tests/qemu-vga.py capture "$monitor" "${RUNNER_TEMP:?}/qemu-$mode-vga-username.png"
     python3 tests/qemu-vga.py type-file "$monitor" "$initial"
     sleep 3
     python3 tests/qemu-vga.py type-file "$monitor" "$initial"
@@ -87,7 +90,14 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     python3 tests/qemu-vga.py type-file "$monitor" "$replacement"
     sleep 3
     python3 tests/qemu-vga.py type-file "$monitor" "$replacement"
-    wait_marker USB_CI_VGA_LOGIN_OK 45
+    if ! wait_marker USB_CI_VGA_LOGIN_OK 45; then
+      if grep -aq USB_CI_PAM_PASSWORD_DATE_UPDATED "$log"; then
+        echo 'PAM did update shadow, but a tty1 login shell marker was not observed' >&2
+      else
+        echo 'No PAM password-change evidence was observed on the guest serial port' >&2
+      fi
+      exit 1
+    fi
     echo 'PASS: real VGA tty1 login and forced PAM password change'
     python3 tests/qemu-vga.py type "$monitor" 'sudo usb-firstboot-complete'
     sleep 3

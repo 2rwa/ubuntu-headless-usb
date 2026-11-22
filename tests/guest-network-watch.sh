@@ -4,9 +4,22 @@ set -Eeuo pipefail
 signal() { printf '%s\n' "USB_CI_NET_$1" > /dev/ttyS0; }
 # Allow slow TCG interactive PAM without preempting host-side diagnosis.
 limit=180
-[[ -f /etc/ubuntu-usb-ci-vga-mode ]] && limit=600
+vga=0
+if [[ -f /etc/ubuntu-usb-ci-vga-mode ]]; then
+  limit=600
+  vga=1
+  login=$(sed -n 's/^login_user=//p' /var/lib/ubuntu-usb/identity)
+fi
+reported=0
 for ((i=0;i<limit;i++)); do
   [[ ! -f /var/lib/ubuntu-usb/network-enabled ]] || break
+  if [[ $vga == 1 && $reported == 0 ]]; then
+    last_change=$(awk -F: -v u="$login" '$1==u {print $3}' /etc/shadow)
+    if [[ $last_change =~ ^[1-9][0-9]*$ ]]; then
+      signal PAM_PASSWORD_DATE_UPDATED
+      reported=1
+    fi
+  fi
   sleep 1
 done
 [[ -f /var/lib/ubuntu-usb/network-enabled ]] || { signal FAILED:no-onboard-marker; exit 1; }

@@ -90,3 +90,14 @@ activates tty1. Recheck with cheap unit tests before another full-image run.
   not fully measured in this tier.
 - Ubuntu tty1/PAM/SSH was not exercised by this smoke; next integration test
   should select the new CI minimal profile, with .deb archive cache enabled.
+
+## 2026-11-22 minimal image and PAM diagnostic run
+
+The first opt-in minimal boot run tests CI-only `config/packages-vga.txt` and
+archives downloaded .deb files separately from the disk and secrets.
+It captures a *username-only* VGA screen before sending password input;
+no image is captured while a password could be visible. A separate guest
+watcher emits `USB_CI_PAM_PASSWORD_DATE_UPDATED` after PAM has modified
+the shadow password-change date. This distinguishes password-transition
+failure from a successful PAM change with a failed tty1 login-shell marker.
+No conclusions are inferred from a QEMU process merely exiting cleanly.
