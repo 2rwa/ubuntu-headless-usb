@@ -2,7 +2,12 @@
 # Provision an already mounted, validated target; only source from entrypoints.
 [[ ${USB_PROVISION_FROM_WRAPPER:-0} == 1 ]] || { echo 'Validated wrapper required' >&2; exit 1; }
 printf 'Installing Ubuntu 24.04 (noble) to USB\n'
-debootstrap --arch=amd64 --variant=minbase noble "$ROOT" "$MIRROR"
+DEBOOTSTRAP_ARGS=(--arch=amd64 --variant=minbase)
+if [[ -n ${USB_APT_CACHE_DIR:-} ]]; then
+  mkdir -p "$USB_APT_CACHE_DIR"
+  DEBOOTSTRAP_ARGS+=("--cache-dir=$USB_APT_CACHE_DIR")
+fi
+debootstrap "${DEBOOTSTRAP_ARGS[@]}" noble "$ROOT" "$MIRROR"
 cat > "$ROOT/etc/apt/sources.list" <<EOF
 deb $MIRROR noble main restricted universe multiverse
 deb $MIRROR noble-updates main restricted universe multiverse

@@ -73,6 +73,13 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends debootstrap gdisk parted dosfstools e2fsprogs qemu-system-x86 ovmf
+      - name: Validate target Ubuntu package availability
+        run: |
+          while IFS= read -r package; do
+            [[ "$package" =~ ^[a-z0-9][a-z0-9+.-]*$ ]] || continue
+            [[ "$package" == linux-firmware && "$USB_SKIP_FIRMWARE" == 1 ]] && continue
+            apt-cache show "$package" >/dev/null || { echo "Missing package: $package" >&2; exit 1; }
+          done < config/packages.txt
       - name: Restore cached .deb packages (optional)
         id: aptcache
         if: inputs.cache_debs

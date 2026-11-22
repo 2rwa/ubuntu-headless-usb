@@ -6,6 +6,10 @@ for script in install.sh lib/provision.sh firstboot-complete.sh register-runner.
 done
 bash "$here/install.sh" --help | grep -q -- '--apply'
 bash "$here/register-runner.sh" --help | grep -q -- '--url'
+# systemd-networkd comes from systemd on Ubuntu 24.04, no standalone package
+if grep -qx systemd-networkd "$here/config/packages.txt"; then
+  echo 'ERROR: invalid Ubuntu 24.04 systemd-networkd package' >&2; exit 1
+fi
 # Prevent a future accidental Actions job from performing destructive USB operations.
 grep -q '\[\[ -t 0 && -t 1 \]\]' "$here/install.sh"
 grep -q 'ERASE ' "$here/install.sh"

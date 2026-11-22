@@ -3,7 +3,6 @@ linux-generic
 linux-firmware
 initramfs-tools
 systemd-sysv
-systemd-networkd
 systemd-resolved
 dbus
 sudo
