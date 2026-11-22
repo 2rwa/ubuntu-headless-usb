@@ -278,3 +278,17 @@ Changes:
 
 Validate new static checks first; then one cached minimal Ubuntu boot test.
 A full green CI result requires BIOS onboarding+network+SSH and UEFI.
+
+
+## 2026-11-22 opt-in live journal/UEFI fallback integration
+
+- Previous revision commit 190fa951: CI-only firstboot wrapper, bounded
+  sudo/systemd journal excerpts over ttyS0, and independent UEFI boot-only
+  fallback on BIOS failure. Static/safety: Actions #45001004461 PASS.
+- Rebuild one minimal Ubuntu image only, with existing .deb archive cache.
+- Expect to distinguish sudo command not reached (no FIRSTBOOT_BEGIN) from
+  guest firstboot command start, failure, success, and network readiness.
+- On a BIOS integration failure, check that the UEFI boot+VGA-only step
+  actually executes; the bare UEFI pass is not an onboarding/SSH pass.
+- Assert that logs contain real journal records when the 12-second pending
+  diagnostic is reached; do not publish credentials or password frames.

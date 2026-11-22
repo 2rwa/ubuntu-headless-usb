@@ -44,6 +44,9 @@ grep -Fq 'usb-ci-journal-diagnostics' "$here/tests/guest-network-watch.sh"
 grep -Fq 'journalctl -b -t sudo' "$here/tests/guest-journal-diagnostics.sh"
 grep -Fq 'journalctl -b -n 55' "$here/tests/guest-journal-diagnostics.sh"
 grep -Fq 'USB_CI_JOURNAL_END' "$here/tests/guest-journal-diagnostics.sh"
+# Even when BIOS integration fails, UEFI must still exercise firmware+VGA.
+grep -Fq "if: always() && steps.imagebuild.outcome == 'success'" "$here/.github/workflows/usb-ci.yml"
+grep -Fq "steps.biosboot.outcome == 'success'" "$here/.github/workflows/usb-ci.yml"
 # Cache must be made readable to the non-root archive saver.
 grep -Fq 'sudo chown -R' "$here/.github/workflows/usb-ci.yml"
 grep -Fq 'sudo rm -rf -- "$CACHE/partial"' "$here/.github/workflows/usb-ci.yml"
