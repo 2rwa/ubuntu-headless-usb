@@ -495,3 +495,20 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
   linux-firmware package initially). Assert gcc/g++/make/CMake/Ninja/Git/
   Python/Node/npm/jq/rsync in the generated image AND via actual SSH under
   both BIOS and UEFI. Maintain all minimal image security assertions.
+
+
+## 2026-11-22 — one-off complete developer tool profile integration
+
+- Prior minimal BIOS and UEFI full network+SSH run
+  [#45019347866](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/45019347866)
+  passed both paths and their SSH security assertions.
+- Full-image test implementation static/safety
+  [#45024068313](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/45024068313)
+  passed. No image built for that cheap test.
+- Trigger exactly one opt-in [full-boot-ci-once] test on push. This uses
+  config/packages.txt, USB_CI_MINIMAL=0 and USB_SKIP_FIRMWARE=1, with the
+  separate full APT cache key. Verify real gcc/g++/make/CMake/Ninja/Git/
+  Python/Node/npm/jq/rsync executables in the chroot and over actual SSH
+  on both BIOS and UEFI, while preserving PAM, DHCP and denied-login tests.
+- This does NOT claim firmware-inclusive real hardware support. A later
+  real USB test is required to verify that and physical drive reliability.
