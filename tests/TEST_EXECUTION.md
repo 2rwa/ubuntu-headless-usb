@@ -157,3 +157,16 @@ No conclusions are inferred from a QEMU process merely exiting cleanly.
 - Run `tests/test_serial_relay.sh` in cheap checks; it verifies log
   forwarding before the source has finished. Avoid image rebuilds for
   serial-stream test changes alone.
+
+
+## 2026-11-22 one-off CI live-serial integration check
+
+- The lightweight serial relay test passed on Actions #44980836549.
+- Perform a single minimal Ubuntu boot integration run with cached .deb
+  packages. Verify that ttyS0 logs stream into the Actions BIOS step before
+  QEMU exits; preserve the complete file as a separate artifact.
+- BIOS and UEFI total runtime limits: 180s each, and individual marker limits
+  remain bounded in seconds.
+- Check for actual APT cache restore HIT. In case of login failure inspect
+  PAM_PASSWORD_DATE_UPDATED, LOGIN_MARKER_PENDING and tty1 process listing.
+- Do not rerun the full development-tool package profile for this test.
