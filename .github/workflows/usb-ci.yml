@@ -53,7 +53,7 @@ jobs:
           fi
   image:
     needs: safety
-    if: (github.event_name == 'workflow_dispatch' && inputs.level != 'static') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[image-ci-once]'))
+    if: (github.event_name == 'workflow_dispatch' && inputs.level != 'static') || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[image-ci-once]') || contains(github.event.head_commit.message, '[boot-ci-once]')))
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -98,10 +98,10 @@ jobs:
           sudo -E bash tests/build-image.sh "$IMAGE"
           df -h
       - name: BIOS boot
-        if: inputs.level == 'boot'
+        if: (github.event_name == 'workflow_dispatch' && inputs.level == 'boot') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[boot-ci-once]'))
         run: bash tests/qemu-boot.sh bios "$IMAGE" "${{ runner.temp }}/qemu-bios.log"
       - name: UEFI boot
-        if: inputs.level == 'boot'
+        if: (github.event_name == 'workflow_dispatch' && inputs.level == 'boot') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[boot-ci-once]'))
         run: bash tests/qemu-boot.sh uefi "$IMAGE" "${{ runner.temp }}/qemu-uefi.log"
       - name: Network usage summary
         if: always()
