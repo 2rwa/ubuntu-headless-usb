@@ -130,3 +130,17 @@ No conclusions are inferred from a QEMU process merely exiting cleanly.
 4. Low-cost tests check the marker boundary and cache permission step.
    Run cheap safety checks first, then one opt-in minimal-image integration.
    Full success and the next cache hit still require real validation.
+
+
+## 2026-11-22 one-off minimal integration rerun
+
+- CI shell-to-serial marker and archive permission fix committed in 7f79075.
+- Static/safety checks passed in Actions #44979829510.
+- Explicitly rerun a minimal-image BIOS→tty1/PAM→onboarding/SSH→UEFI boot test.
+- This run should **populate** the previously missing archive cache. Record the
+  result of actions/cache/save (which failed on #44976878592) and distinguish
+  a completed cache write from a *future* cache restore hit.
+- If the shell marker is absent, check the guest serial diagnostics and
+  separately identify whether the shadow password date updated.
+- Do not upload the raw image, passwords, or private SSH keys; preserve
+  QEMU text-mode screenshots only before password entry and after login.
