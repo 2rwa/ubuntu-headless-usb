@@ -23,13 +23,24 @@ if [[ $mode == uefi ]]; then
         -drive "if=pflash,format=raw,file=$scratch")
 fi
 echo "Booting QEMU $mode (TCG); checking OS, onboarding and local SSH..."
+# QEMU writes the complete serial console to a retained artifact file.
+# Also follow it LIVE into the GitHub Actions step, rather than hiding all
+# systemd/PAM messages until the marker wait times out.
+[[ ! -e $log && ! -L $log ]] || { echo "Serial log collision: $log" >&2; exit 1; }
+: > "$log"
+echo "LIVE_SERIAL_BEGIN mode=$mode source=$log"
+bash tests/serial-relay.sh "$log" &
+serial_relay_pid=$!
 "${cmd[@]}" >"$log.qemu-stderr" 2>&1 &
 pid=$!
 cleanup() {
   kill "$pid" 2>/dev/null || :
   wait "$pid" 2>/dev/null || :
+  kill "$serial_relay_pid" 2>/dev/null || :
+  wait "$serial_relay_pid" 2>/dev/null || :
   [[ -z $scratch ]] || rm -f "$scratch"
   rm -f "$monitor"
+  echo "LIVE_SERIAL_END mode=$mode"
 }
 trap cleanup EXIT
 wait_marker() {

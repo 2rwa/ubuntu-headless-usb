@@ -205,3 +205,29 @@ explicit per-marker timing in Actions logs. The already-started workflow
 continues to run the version from its own checkout; the fix affects only
 subsequent runs. Avoid a new expensive image build until the running test's
 actual result and cache-save outcome are available.
+
+
+## Live serial, explicit stage deadlines and BIOS/UEFI 180s caps (2026-11-22)
+
+- `tests/qemu-boot.sh` now starts `tests/serial-relay.sh` alongside
+  QEMU to forward the guest's **actual ttyS0 boot output directly to Actions
+  stdout while QEMU remains alive**. The original byte log is still saved
+  to `qemu-bios.log` / `qemu-uefi.log` and uploaded as an artifact.
+- Log stream boundaries are `LIVE_SERIAL_BEGIN` and `LIVE_SERIAL_END`;
+  individual host marker waits also record time budgets and observed durations.
+- The relay subprocess is terminated when QEMU exits or fails. It uses
+  `tail -n +1 -f` on the existing regular serial log. A cheap behavior test
+  `tests/test_serial_relay.sh` verifies marker output **before** source
+  process termination. This does not require Ubuntu debootstrap or QEMU.
+- Each BIOS/UEFI boot *integration* step has a **180-second total hard limit**
+  via GNU `timeout`, independent of each stage's smaller deadline. A
+  timeout fails the step, preserving available logs and diagnostics. The cap
+  applies to the boot+PAM+SSH integration test, not just firmware POST.
+- The root-owned guest watcher emits a one-time
+  `USB_CI_NET_LOGIN_MARKER_PENDING` after 10s with a changed PAM password
+  date but no login-shell marker, followed by a minimal tty1 process listing.
+  This may distinguish an active PAM/login process from an interactive shell;
+  it does not expose passwords. Password typing occurs through VGA/HMP, not
+  through ttyS0. Never stream/retain a screenshot of password entry.
+- These updates affect only the CI test harness; physical USB login and
+  production password handling remain unchanged.

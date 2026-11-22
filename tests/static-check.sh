@@ -7,6 +7,10 @@ done
 python3 -m py_compile "$here/tests/qemu-vga.py"
 python3 "$here/tests/test_qemu_vga.py"
 bash -n "$here/tests/vga-smoke.sh"
+bash -n "$here/tests/serial-relay.sh"
+bash -n "$here/tests/test_serial_relay.sh"
+bash "$here/tests/test_serial_relay.sh"
+grep -Fq 'LIVE_SERIAL_BEGIN' "$here/tests/qemu-boot.sh"
 # Polling timeouts are in seconds; a 45-second login timeout must not become 225.
 grep -Fq 'SECONDS - started < limit' "$here/tests/qemu-boot.sh"
 grep -Fq 'sleep 1' "$here/tests/qemu-boot.sh"

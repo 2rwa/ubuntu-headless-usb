@@ -12,6 +12,8 @@ if [[ -f /etc/ubuntu-usb-ci-vga-mode ]]; then
 fi
 reported=0
 login_reported=0
+login_pending_reported=0
+pam_change_at=0
 if [[ $vga == 1 ]]; then
   expected_uid=$(id -u "$login")
 fi
@@ -31,7 +33,16 @@ for ((i=0;i<limit;i++)); do
     if [[ $last_change =~ ^[1-9][0-9]*$ ]]; then
       signal PAM_PASSWORD_DATE_UPDATED
       reported=1
+      pam_change_at=$SECONDS
     fi
+  fi
+  # A PAM password-date transition is not a shell login. If the CI marker
+  # remains missing, print safe tty1 process state to the LIVE serial stream.
+  if [[ $vga == 1 && $reported == 1 && $login_reported == 0 &&
+        $login_pending_reported == 0 ]] && (( SECONDS - pam_change_at >= 10 )); then
+    signal LOGIN_MARKER_PENDING
+    ps -t tty1 -o pid,ppid,user,comm --no-headers > /dev/ttyS0 2>&1 || :
+    login_pending_reported=1
   fi
   sleep 1
 done

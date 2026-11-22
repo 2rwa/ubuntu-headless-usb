@@ -144,3 +144,16 @@ No conclusions are inferred from a QEMU process merely exiting cleanly.
   separately identify whether the shadow password date updated.
 - Do not upload the raw image, passwords, or private SSH keys; preserve
   QEMU text-mode screenshots only before password entry and after login.
+
+
+## Live ttyS0 telemetry and bounded waits
+
+- BIOS and UEFI integrated boot stages now stream the pre-existing QEMU
+  `-serial file:` log into the running Actions step, retain the file as
+  artifact, and enforce **180s overall per-boot** hard failure.
+- Each marker wait counts seconds, not polling iterations, and reports
+  stage duration. When PAM updates shadow but login marker remains absent,
+  guest root watcher emits a pending marker and safe tty1 process status.
+- Run `tests/test_serial_relay.sh` in cheap checks; it verifies log
+  forwarding before the source has finished. Avoid image rebuilds for
+  serial-stream test changes alone.
