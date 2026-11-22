@@ -62,6 +62,22 @@ mount "$ESP" "$ROOT/boot/efi"
 keybase="$RUNNER_TEMP/usb-ci-ssh-key"
 [[ ! -e $keybase && ! -L $keybase && ! -e $keybase.pub ]] || { echo "CI key collision" >&2; exit 1; }
 ssh-keygen -q -t ed25519 -N '' -f "$keybase"
+# Image creation runs under sudo with umask 077. SSH authentication runs
+# later as the unprivileged Actions runner; keeping the private key
+# root-owned made ssh fail locally with "Load key: Permission denied".
+# Transfer only this CI test key to the invoking runner, not credentials in
+# the guest image. Preserve SSH's restrictive private-key mode.
+[[ ${SUDO_UID:-} =~ ^[0-9]+$ && ${SUDO_GID:-} =~ ^[0-9]+$ ]] || {
+  echo 'Missing numeric sudo runner identity for CI SSH key' >&2
+  exit 1
+}
+[[ $(stat -c %u "$RUNNER_TEMP") == "$SUDO_UID" ]] || {
+  echo 'Runner temp directory ownership does not match sudo invoker' >&2
+  exit 1
+}
+chown "$SUDO_UID:$SUDO_GID" "$keybase" "$keybase.pub"
+chmod 0600 "$keybase"
+chmod 0644 "$keybase.pub"
 KEY="$keybase.pub"
 USB_PROVISION_FROM_WRAPPER=1
 source "$HERE/lib/provision.sh"

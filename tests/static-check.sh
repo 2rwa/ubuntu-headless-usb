@@ -56,6 +56,11 @@ grep -Fq 'signal FAILED:no-QEMU-DHCP-address' "$here/tests/guest-network-watch.s
 grep -Fq 'chmod 0644 "$ROOT/etc/systemd/network/20-usb-ethernet.network"' "$here/lib/provision.sh"
 grep -Fq "network_file=\"\$root/etc/systemd/network/20-usb-ethernet.network\"" "$here/tests/inspect-root.sh"
 grep -Fq 'stat -c %a "$network_file"' "$here/tests/inspect-root.sh"
+# CI SSH private key is created by sudo but read by the non-root runner.
+grep -Fq 'chown "$SUDO_UID:$SUDO_GID" "$keybase" "$keybase.pub"' "$here/tests/build-image.sh"
+grep -Fq 'chmod 0600 "$keybase"' "$here/tests/build-image.sh"
+grep -Fq 'ssh-keygen -y -f "$key" >/dev/null' "$here/.github/workflows/usb-ci.yml"
+grep -Fq 'stat -c %u:%a "$key"' "$here/.github/workflows/usb-ci.yml"
 # Cache must be made readable to the non-root archive saver.
 grep -Fq 'sudo chown -R' "$here/.github/workflows/usb-ci.yml"
 grep -Fq 'sudo rm -rf -- "$CACHE/partial"' "$here/.github/workflows/usb-ci.yml"

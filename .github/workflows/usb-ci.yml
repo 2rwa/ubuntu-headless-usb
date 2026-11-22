@@ -159,6 +159,18 @@ jobs:
           printf 'Readable .deb files: '
           find "$CACHE" -maxdepth 1 -type f -name '*.deb' | wc -l
           du -sh "$CACHE"
+      - name: Verify CI runner can actually use its private SSH key
+        run: |
+          key="$RUNNER_TEMP/usb-ci-ssh-key"
+          [[ -f "$key" && ! -L "$key" ]] || { echo 'Missing CI SSH private key' >&2; exit 1; }
+          [[ "$(stat -c %u:%a "$key")" == "$(id -u):600" ]] || {
+            echo 'CI SSH private key owner/mode is wrong' >&2
+            exit 1
+          }
+          # Exercise the same non-root key read used by the subsequent ssh call.
+          # Suppress the derived public key; never log private material.
+          ssh-keygen -y -f "$key" >/dev/null
+          echo 'PASS: unprivileged runner can read CI SSH key (0600)'
       - name: BIOS boot (live serial, 180s hard limit)
         id: biosboot
         if: (github.event_name == 'workflow_dispatch' && inputs.level == 'boot') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[boot-ci-once]'))

@@ -356,3 +356,24 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
 - Confirm the real guest reports enp0s2 as managed, with a 10.0.2.* lease
   and successful public-key SSH before claiming DHCP/SSH fixed.
 - If BIOS fails, still collect independent UEFI boot/VGA evidence.
+
+
+## 2026-11-22 — CI host SSH private key file ownership after DHCP fix
+
+- Actions #45013270141 built the image, booted both Legacy BIOS and UEFI,
+  completed the actual tty1 PAM+firstboot flow, and obtained 10.0.2.15 via
+  DHCP with enp0s2 routable/configured on both boots. This confirms the
+  networkd .network file permission fix.
+- BIOS SSH check failed *locally*, repeatedly reporting
+  `Load key ".../usb-ci-ssh-key": Permission denied`. The CI key was
+  created by sudo/root in tests/build-image.sh under umask 077; it was
+  never chowned to the invoking Actions runner. The SSH server did start,
+  so this is not evidence of a guest-side SSH authorization rejection.
+- Fix: validate numeric SUDO_UID/SUDO_GID against the runner temp directory;
+  set ownership of only the temporary CI SSH keypair to that user, private
+  mode 0600, public mode 0644. Keep password files, guest keys, and physical
+  installer behavior unchanged. Before QEMU boot, have the actual non-root
+  Actions runner check private key owner/mode and run `ssh-keygen -y -f`
+  with output discarded. This tests real key readability, not only syntax.
+- Recheck BIOS public-key-only SSH, deny root and runner SSH, and full UEFI
+  onboarding/SSH. No full success until these real checks pass.
