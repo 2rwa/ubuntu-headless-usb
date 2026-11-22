@@ -118,6 +118,19 @@ ExecStart=/bin/sh -c 'printf "USB_CI_BOOT_OK\\n" > /dev/ttyS0'
 WantedBy=multi-user.target
 CIEOF
   chroot "$ROOT" systemctl enable ubuntu-usb-ci-ready.service
+  install -m 755 "$HERE/tests/guest-onboard.sh" "$ROOT/usr/local/sbin/usb-ci-onboard-verify"
+  cat > "$ROOT/etc/systemd/system/ubuntu-usb-ci-onboard.service" <<'CIEOF'
+[Unit]
+Description=USB CI on-guest firstboot and network tests
+After=multi-user.target
+[Service]
+Type=oneshot
+TimeoutStartSec=120
+ExecStart=/usr/local/sbin/usb-ci-onboard-verify
+[Install]
+WantedBy=multi-user.target
+CIEOF
+  chroot "$ROOT" systemctl enable ubuntu-usb-ci-onboard.service
 fi
 chroot "$ROOT" update-initramfs -u -k all
 chroot "$ROOT" grub-install --target=i386-pc --recheck "$DEV"

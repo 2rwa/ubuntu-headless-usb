@@ -61,6 +61,8 @@ jobs:
       USB_RUNNER_USER: ${{ inputs.runner_user }}
       USB_SKIP_FIRMWARE: ${{ inputs.include_firmware && '0' || '1' }}
       USB_CI_EXPLICIT: 'yes'
+      USB_CI_KEEP_KEY: '1'
+      USB_CI_VERIFY_ONBOARD: '1'
     steps:
       - uses: actions/checkout@v4
       - name: Set isolated working paths
@@ -103,6 +105,9 @@ jobs:
       - name: UEFI boot
         if: (github.event_name == 'workflow_dispatch' && inputs.level == 'boot') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[boot-ci-once]'))
         run: bash tests/qemu-boot.sh uefi "$IMAGE" "${{ runner.temp }}/qemu-uefi.log"
+      - name: Remove temporary CI SSH credentials
+        if: always()
+        run: sudo rm -f "$RUNNER_TEMP/usb-ci-ssh-key" "$RUNNER_TEMP/usb-ci-ssh-key.pub"
       - name: Network usage summary
         if: always()
         run: |

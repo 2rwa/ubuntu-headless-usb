@@ -68,5 +68,15 @@ lower when omitting firmware. Packages and mirrors change over time.
 Repeated builds should use pinned Ubuntu release components and compare the
 observed network bytes rather than relying on these estimates.
 
-Actual USB boot behavior, physical USB endurance, firmware quirks, and Secure
-Boot require separate real-machine testing.
+The boot job also verifies the initial network/SSH lock, expected refusal of
+premature onboarding and runner registration, a **simulated** successful local
+password-change date update, firstboot service activation, public-key SSH
+login, root/runner SSH denial, and idempotent repeated completion. The
+interactive PAM password-change dialogue is **not** tested by this simulation.
+CI-only guest test services are not installed by the physical USB builder.
+QEMU user networking is restricted from external internet access. A private
+test SSH key remains solely on the CI runner for boot tests and is deleted
+before the job finishes; it is never uploaded as an artifact.
+
+Actual USB boot behavior, physical USB endurance, real LAN multicast/mDNS,
+interactive PAM password change and Secure Boot require separate real-machine testing.

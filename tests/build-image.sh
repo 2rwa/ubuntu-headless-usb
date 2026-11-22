@@ -25,7 +25,9 @@ cleanup() {
     rmdir "$ROOT" 2>/dev/null || :
   fi
   [[ -z $DEV ]] || losetup -d "$DEV" || :
-  [[ -z $KEY ]] || rm -f "$KEY" "${KEY%.pub}"
+  if [[ ${USB_CI_KEEP_KEY:-0} != 1 ]]; then
+    [[ -z $KEY ]] || rm -f "$KEY" "${KEY%.pub}"
+  fi
   if [[ -e $IMAGE ]]; then
     du -h "$IMAGE" || :
     if [[ -n ${SUDO_UID:-} && -n ${SUDO_GID:-} ]]; then
@@ -56,10 +58,10 @@ ROOT=$(mktemp -d "$RUNNER_TEMP/ubuntu-usb-root.XXXXXXXX")
 mount -o noatime "$ROOTPART" "$ROOT"
 mkdir -p "$ROOT/boot/efi"
 mount "$ESP" "$ROOT/boot/efi"
-KEY=$(mktemp "$RUNNER_TEMP/usb-ci-ssh.XXXXXXXX")
-rm -f "$KEY"
-ssh-keygen -q -t ed25519 -N '' -f "$KEY"
-KEY="$KEY.pub"
+keybase="$RUNNER_TEMP/usb-ci-ssh-key"
+[[ ! -e $keybase && ! -L $keybase && ! -e $keybase.pub ]] || { echo "CI key collision" >&2; exit 1; }
+ssh-keygen -q -t ed25519 -N '' -f "$keybase"
+KEY="$keybase.pub"
 USB_PROVISION_FROM_WRAPPER=1
 source "$HERE/lib/provision.sh"
 bash "$HERE/tests/inspect-root.sh" "$ROOT" "$LOGIN_USER" "$RUNNER_USER" "$LUID" "$RUID" "$ROOTPART" "$ESP"
