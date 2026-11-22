@@ -73,6 +73,13 @@ grep -Fq 'PASS: SSH public-key authentication as expected login user' "$here/tes
 grep -Fq 'SSH_REMOTE_FAIL:inactive:' "$here/tests/qemu-boot.sh"
 grep -Fq 'FAIL: SSH transport/public-key authentication failed' "$here/tests/qemu-boot.sh"
 grep -Fq 'FAIL: SSH authenticated but guest network/service assertion failed' "$here/tests/qemu-boot.sh"
+# Root-only marker is verified by the guest watcher (ttyS0); the SSH user
+# must NOT be asked to read a file under /var/lib/ubuntu-usb (0700).
+grep -Fq 'wait_marker USB_CI_NET_ONBOARD_MARKER_SEEN 5' "$here/tests/qemu-boot.sh"
+! grep -Fq 'test -f /var/lib/ubuntu-usb/network-enabled' "$here/tests/qemu-boot.sh"
+grep -Fq 'SSH_REMOTE_UNIT_OK:' "$here/tests/qemu-boot.sh"
+# No password-stage screenshot, even after a successful remote SSH test.
+! grep -Fq 'qemu-$mode-vga-after.png' "$here/tests/qemu-boot.sh"
 # Cache must be made readable to the non-root archive saver.
 grep -Fq 'sudo chown -R' "$here/.github/workflows/usb-ci.yml"
 grep -Fq 'sudo rm -rf -- "$CACHE/partial"' "$here/.github/workflows/usb-ci.yml"

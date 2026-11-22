@@ -181,6 +181,10 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
   # Guest's 45s DHCP deadline plus journal diagnostics must fit here;
   # the earlier 60s/60s race killed the VM before its failure evidence.
   wait_marker USB_CI_NET_READY 75
+  # The guest's ROOT watcher checks /var/lib/ubuntu-usb/network-enabled
+  # (parent is 0700). Never require the unprivileged SSH login user to
+  # traverse that protected directory.
+  wait_marker USB_CI_NET_ONBOARD_MARKER_SEEN 5
   key="${RUNNER_TEMP:?}/usb-ci-ssh-key"
   [[ -s $key ]] || { echo 'CI private SSH key missing' >&2; exit 1; }
   login=${USB_LOGIN_USER:-developer}
@@ -214,9 +218,8 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
   }
   echo "PASS: SSH public-key authentication as expected login user ($mode)"
   if ! ssh "${ssh_args[@]}" "$login@127.0.0.1" '
-    test -f /var/lib/ubuntu-usb/network-enabled || {
-      echo "SSH_REMOTE_FAIL:no-onboard-marker"; exit 1;
-    }
+    # Root-only onboarding marker is tested by guest CI watcher over serial.
+    # A successful unprivileged SSH login can inspect service state instead.
     for unit in ssh.service systemd-networkd.service avahi-daemon.service; do
       if systemctl is-active --quiet "$unit"; then
         echo "SSH_REMOTE_UNIT_OK:$unit"
@@ -228,7 +231,7 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     echo "FAIL: SSH authenticated but guest network/service assertion failed ($mode)" >&2
     exit 1
   fi
-  echo "PASS: remote onboard marker and required guest services ($mode)"
+  echo "PASS: root-watcher onboard marker and unprivileged remote service checks ($mode)"
   if ssh "${ssh_args[@]}" "root@127.0.0.1" true >/dev/null 2>&1; then
     echo 'Root SSH login unexpectedly succeeded' >&2
     exit 1
@@ -238,5 +241,6 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     exit 1
   fi
   echo "PASS: QEMU $mode onboarding, network services and public-key-only SSH"
-  python3 tests/qemu-vga.py capture "$monitor" "${RUNNER_TEMP:?}/qemu-$mode-vga-after.png"
+  # Credential-phase VGA contents must NEVER be captured to artifacts;
+  # the observer already disabled screenshots before any password entry.
 fi

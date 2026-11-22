@@ -446,3 +446,22 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
 - BIOS and UEFI retain the 180s total QEMU integration limit, including SSH.
 - If firstboot does not complete, identify which labelled systemctl stage
   remained in progress rather than blindly increasing timeouts.
+
+
+## 2026-11-22 — SSH authenticated; root-only marker was wrongly tested from user shell
+
+- Run [#45018497568](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/45018497568):
+  BIOS firstboot completed in 46s, with per-stage serial timings (19s
+  ssh-keygen, 10s ssh.service enable). DHCP READY arrived, and real public-key
+  SSH `id -un` logged PASS, proving transport/authentication and identity.
+- Remote `test -f /var/lib/ubuntu-usb/network-enabled` then failed. The
+  directory is explicitly 0700 and the marker 0600, so `developer` cannot
+  traverse it to test file existence. The failure was not onboarding failure:
+  guest root-owned watcher had already sent `USB_CI_NET_ONBOARD_MARKER_SEEN`
+  and `USB_CI_NET_READY` over serial.
+- Fix test, NOT production permissions: require the root-owned marker on
+  serial; inspect the network/SSH/Avahi service states from unprivileged SSH.
+  Preserve the negative SSH assertions (root and runner must be denied).
+- Also remove the post-credential explicit VGA screenshot; all saved PNGs
+  must precede any password or login secret typing.
+- Recheck with static tests, then one cached minimal BIOS/UEFI integration.
