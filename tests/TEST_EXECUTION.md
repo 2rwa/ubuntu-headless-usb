@@ -465,3 +465,13 @@ A full green CI result requires BIOS onboarding+network+SSH and UEFI.
 - Also remove the post-credential explicit VGA screenshot; all saved PNGs
   must precede any password or login secret typing.
 - Recheck with static tests, then one cached minimal BIOS/UEFI integration.
+
+
+## 2026-11-22 — one-shot cached BIOS and full UEFI confirmation
+
+- Fast/safety checks passed in [Actions #45019261059](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/45019261059).
+- One image run checks: real VGA PAM, firstboot stages, DHCP 10.0.2.*,
+  guest-root serial onboard marker, SSH login identity and remote services,
+  root and runner SSH denials, then full UEFI boot/SSH verification.
+- Strict private marker permissions and pre-credential-only VGA screenshots
+  remain enforced. Do not assert success without the real SSH commands.
