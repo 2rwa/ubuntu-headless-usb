@@ -64,3 +64,19 @@ activates tty1. Recheck with cheap unit tests before another full-image run.
 - Run the same BIOS→PAM password-change→network/SSH→UEFI checks, reporting
   partial success separately from full completion.
 - No firmware, no package cache or raw-image artifact, no physical USB target.
+
+## 2026-11-22 — Split smoke/minimal/full profiles
+
+- Cheap `level=vga`: QEMU built-in BIOS only, PNG + HMP keyboard command,
+  no Ubuntu packages downloaded. One-off trigger: `[vga-ci-once]`.
+- Minimal Ubuntu `level=boot`, `minimal_image=true`: kernel, getty/PAM,
+  SSH/networkd/Avahi. No Node/npm/build-essential or full dev dependencies.
+- Full Ubuntu `minimal_image=false`: validate the actual USB package set.
+- Heavy tests enable .deb-only Actions cache when opted in; separate cache
+  keys distinguish package profiles and firmware options. Never cache image,
+  password or test keys.
+- Previous Actions #14 successfully rendered `tty1 login:` before the
+  failed network-onboarding watchdog. Treat screen rendering as passing,
+  keyboard/PAM interaction as unresolved.
+- A temporary syntax issue from editing the minimal profile was diagnosed by
+  the cheap safety checks and fixed before rerunning any full image build.

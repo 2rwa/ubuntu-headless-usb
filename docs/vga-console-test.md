@@ -95,3 +95,22 @@ getty@tty1 without test-only services.
 - This fixes the **test harness**, not an asserted hardware fault. Actual
   VGA login, PAM password change, SSH and UEFI tests remain unverified until
   the next opt-in integration run.
+
+## 2026-11-22 — VGA is working; shrink test cost
+
+Actions [#14](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44973725447)
+recorded an actual 1280×800, two-color `tty1` login prompt screenshot
+(`usb-ci-01 login:`). The guest reached `USB_CI_PRE_ONBOARD_LOCK_OK` but
+failed `USB_CI_NET_FAILED:no-onboard-marker` after the interactive login
+flow did not complete. Thus **VGA framebuffer rendering is proven**, but
+**PAM and keyboard-input correctness are still unverified**.
+
+The new lightweight `tests/vga-smoke.sh` runs SeaBIOS without Ubuntu to
+regress QEMU VGA capture and HMP input at low bandwidth cost. For real Linux
+console/PAM tests, use `config/packages-vga.txt` instead of a large full
+development image. Normal development package installation should be tested
+only after the console flow is fixed.
+
+Archive-only Actions cache is available for repeated minimal/full builds;
+report transfer cost as well as saved download volume. Cache contains no
+root filesystem, credentials or private keys.

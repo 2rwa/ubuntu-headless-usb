@@ -85,3 +85,26 @@ before the job finishes; it is never uploaded as an artifact.
 
 Actual USB boot behavior, physical USB endurance, real LAN multicast/mDNS,
 interactive PAM password change and Secure Boot require separate real-machine testing.
+
+## Bandwidth-conscious CI tiers (2026-11-22)
+
+- **VGA smoke**: choose `level=vga` in Actions, or use a one-off commit
+  message containing `[vga-ci-once]`. QEMU boots only its built-in SeaBIOS;
+  no Ubuntu disk image, debootstrap or Linux development packages. It captures
+  a framebuffer PNG and checks HMP keyboard command acceptance. This does
+  **not** verify an Ubuntu login prompt or PAM.
+- **Minimal Ubuntu**: use `level=boot` with `minimal_image=true` (default)
+  or `[boot-ci-once]` on a push. The CI-only package list is
+  [config/packages-vga.txt](config/packages-vga.txt); it includes kernel,
+  GRUB, getty/PAM, networkd, sudo, SSH and Avahi, but omits Node, npm and
+  compilers. It verifies the real Ubuntu login/firstboot stack.
+- **Full Ubuntu**: choose `minimal_image=false` for end-to-end validation of
+  the actual development-tool profile, configured in `config/packages.txt`.
+- **Archive cache**: heavy tests can restore/save only `.deb` files using
+  Actions Cache, with separate keys for minimal/full profiles. It **never**
+  caches the raw disk image, test SSH keys, or temporary passwords. First-time
+  cache population itself consumes upload bandwidth; use VGA smoke while
+  debugging only QEMU display or keyboard transport.
+
+The real physical USB install script is unchanged: it always installs the full
+package profile and retains the interactive disk-erase confirmation.
