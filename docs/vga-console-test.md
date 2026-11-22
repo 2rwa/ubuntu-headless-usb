@@ -73,3 +73,25 @@ getty@tty1 without test-only services.
 - `lib/provision.sh`: headless target and CI-only guest hook.
 - `.github/workflows/usb-ci.yml`: explicit `[boot-ci-once]` or manual boot
   test trigger. The default push stays static-only.
+
+## 2026-11-22 10:37 JST — run #12 failure analysis
+
+- [Actions #12](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44971965177)
+  successfully built Ubuntu 24.04 and reached the BIOS systemd marker.
+- The uploaded serial log explicitly confirms that `getty@tty1.service` was
+  started, in addition to serial getty, and reports
+  `USB_CI_PRE_ONBOARD_LOCK_OK`.
+- The previous image classifier inspected one pixel out of 97 and demanded
+  **three distinct colors**. A legitimate two-color VGA text console would fail.
+  Moreover, it deleted the PPM before saving a PNG, eliminating diagnostic
+  evidence whenever this check failed.
+- The new capture logic counts all pixels, accepts genuine two-color text with
+  sufficient foreground area, and **always writes PNG before asserting**.
+- The QEMU monitor now explicitly switches to `tty1` using
+  `sendkey ctrl-alt-f1`. Blank images and framebuffer metrics will be
+  retained in Actions artifacts on failure, with no passwords visible.
+- Two cheap unit regressions check (1) a two-color console passes and
+  (2) a black VGA image fails **but its PNG remains available**.
+- This fixes the **test harness**, not an asserted hardware fault. Actual
+  VGA login, PAM password change, SSH and UEFI tests remain unverified until
+  the next opt-in integration run.

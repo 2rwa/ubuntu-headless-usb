@@ -62,10 +62,11 @@ wait_marker() {
 }
 wait_marker USB_CI_BOOT_OK
 echo "PASS: QEMU $mode reached systemd multi-user"
-# Capture a real VGA text-mode framebuffer, even on a headless Actions runner.
-sleep 4
-python3 tests/qemu-vga.py enter "$monitor"
-sleep 2
+# Capture real tty1 VGA text, even with serial as the primary kernel console.
+# On any failure, the capture utility preserves a diagnostic PNG in artifacts.
+sleep 3
+python3 tests/qemu-vga.py tty1 "$monitor"
+sleep 3
 python3 tests/qemu-vga.py capture "$monitor" "${RUNNER_TEMP:?}/qemu-$mode-vga-before.png"
 if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
   if [[ $mode == bios && ${USB_CI_VGA_LOGIN:-0} == 1 ]]; then

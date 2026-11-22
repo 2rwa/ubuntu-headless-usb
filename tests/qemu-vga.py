@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Headless QEMU HMP keyboard & screendump test. Standard library only."""
 import argparse
+from collections import Counter
 import pathlib
 import re
 import socket
@@ -107,18 +108,25 @@ def screenshot(sock, png_path):
                 break
             time.sleep(0.1)
         w, h, rgb = read_ppm(ppm.read_bytes())
-        # A black or solid-color VGA buffer is not proof of a working console.
-        colors = {rgb[i:i+3] for i in range(0, len(rgb), 291)}
-        if len(colors) < 3:
-            raise AssertionError("VGA framebuffer appears blank/solid")
+        # Count *all* pixels. Text consoles commonly contain exactly TWO colors:
+        # sampled-pixel / >=3-color checks falsely classify them as blank.
+        palette = Counter(rgb[i:i + 3] for i in range(0, len(rgb), 3))
+        different_pixels = (w * h) - palette.most_common(1)[0][1]
+        # Always retain diagnostic images, including blank screens.
         make_png(path, w, h, rgb)
-        print("PASS: VGA framebuffer captured as PNG (%dx%d; %d sampled colors)" % (w, h, len(colors)))
+        print("VGA_CAPTURE file=%s width=%d height=%d colors=%d minority_pixels=%d"
+              % (path, w, h, len(palette), different_pixels), flush=True)
+        # A login prompt contains many glyph pixels; a 1- or 2-pixel cursor
+        # artifact is not enough to prove a usable VGA text console.
+        if len(palette) < 2 or different_pixels < max(64, (w * h) // 2000):
+            raise AssertionError("VGA screen is visually blank; diagnostic PNG retained")
+        print("PASS: VGA framebuffer has visible foreground/background contrast")
     finally:
         ppm.unlink(missing_ok=True)
 
 def main():
     cli = argparse.ArgumentParser()
-    cli.add_argument("action", choices=["type", "type-file", "enter", "capture"])
+    cli.add_argument("action", choices=["type", "type-file", "enter", "capture", "tty1"])
     cli.add_argument("socket")
     cli.add_argument("argument", nargs="?")
     args = cli.parse_args()
@@ -127,6 +135,10 @@ def main():
             screenshot(sock, args.argument)
         elif args.action == "enter":
             press(sock, "\n")
+        elif args.action == "tty1":
+            # Explicitly activate VT1; kernel console=ttyS0 may own /dev/console.
+            command(sock, "sendkey ctrl-alt-f1 100")
+            print("Requested Linux VT1 on emulated VGA display")
         elif args.action == "type-file":
             # Password never enters argv, stdout, GitHub Actions logs, or artifacts.
             value = pathlib.Path(args.argument).read_text().strip()

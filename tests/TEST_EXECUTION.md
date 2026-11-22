@@ -46,3 +46,10 @@
 - One fresh full build, with no firmware and no upload of image/cache/secrets.
 - Result must be reported separately from the initial static checks. On failure,
   inspect serial and screenshot evidence and update this documentation.
+
+## VGA capture false-negative regression
+
+Run #12 (2026-11-22) built the system and started getty@tty1 but aborted
+because the capture code demanded three colors. A two-color console is normal.
+The test now uses all-pixel statistics, preserves blank-screen PNGs, and
+activates tty1. Recheck with cheap unit tests before another full-image run.

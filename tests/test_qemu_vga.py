@@ -38,6 +38,41 @@ class VGATests(unittest.TestCase):
         for data in (b"BAD", b"P6\n4 2\n255\n", b"P6\n320 200\n255\n"):
             with self.assertRaises(ValueError):
                 module.read_ppm(data)
+    def test_two_color_tty_is_not_blank(self):
+        # Real VGA text mode often contains exactly two colors, not three.
+        w, h = 320, 200
+        rgb = bytearray(b"\x00\x00\x00" * (w * h))
+        for row in range(30, 55):
+            for col in range(35, 95):
+                offset = (row * w + col) * 3
+                rgb[offset:offset+3] = b"\xd0\xd0\xd0"
+        with tempfile.TemporaryDirectory() as td:
+            target = pathlib.Path(td) / "two-color.png"
+            original = module.command
+            module.command = lambda sock, cmd: pathlib.Path(
+                cmd.split(" ", 1)[1]).write_bytes(
+                    b"P6\n320 200\n255\n" + bytes(rgb))
+            try:
+                module.screenshot(FakeMonitor(), target)
+                self.assertTrue(target.exists())
+            finally:
+                module.command = original
+
+    def test_blank_screenshot_retained_on_failure(self):
+        w, h = 320, 200
+        with tempfile.TemporaryDirectory() as td:
+            target = pathlib.Path(td) / "blank.png"
+            original = module.command
+            module.command = lambda sock, cmd: pathlib.Path(
+                cmd.split(" ", 1)[1]).write_bytes(
+                    b"P6\n320 200\n255\n" + b"\x00\x00\x00" * (w * h))
+            try:
+                with self.assertRaisesRegex(AssertionError, "diagnostic PNG retained"):
+                    module.screenshot(FakeMonitor(), target)
+                self.assertTrue(target.exists())
+            finally:
+                module.command = original
+
     def test_keyboard(self):
         fake = FakeMonitor()
         module.press(fake, "abc-09_\n")
