@@ -183,3 +183,17 @@ No conclusions are inferred from a QEMU process merely exiting cleanly.
 - The prior minimal run #44980879541 was **not** a successful PAM login; even
   though the shadow date changed, guest tty1 showed root-owned `login` but
   not a user shell. APT restore did produce a cache hit.
+
+
+## 2026-11-22: real concurrent QEMU monitor smoke verified
+
+- [Actions #44983218828](https://github.com/2rwa/ubuntu-headless-usb/actions/runs/44983218828): safety + VGA smoke PASSED without Ubuntu image build.
+- Observer produced three consecutive 720x400 frames while independent HMP
+  keyboard/capture calls ran. Changed scanlines included rows 221-222, proving
+  frames were sampled while the guest video state changed; observer and
+  input sockets did not contend. No secret frames were uploaded.
+- Next single minimal-boot test uses the existing cache to inspect the root
+  login process that previously remained after a PAM password-date change.
+- Correlate VGA_OBSERVER FRAME timestamps with USB_CI_* serial markers and
+  respect the 180-second maximum for BIOS/UEFI integrations. No full package
+  image is needed to test the concurrency feature.
