@@ -65,3 +65,65 @@ usb_apt_transaction() {
   echo 'ERROR: APT acquisition exhausted; verified archives retained on builder.' >&2
   return 1
 }
+
+usb_mount_chroot() {
+  local root=$1 dir
+  for dir in dev proc sys; do
+    mkdir -p "$root/$dir" || return
+    mount --rbind "/$dir" "$root/$dir" || return
+    mount --make-rslave "$root/$dir" || return
+  done
+  mkdir -p "$root/run" || return
+  mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs "$root/run"
+}
+usb_stage_no_mounts() {
+  local stage=$1 mounts
+  mounts=$(findmnt -rn -o TARGET) || return
+  if grep -Fqx "$stage" <<< "$mounts" || grep -Fq "$stage/" <<< "$mounts"; then
+    echo "ERROR: mounted content in staging root: $stage" >&2
+    return 1
+  fi
+}
+usb_drop_stage() {
+  local stage=$1
+  [[ -n $stage ]] || return 0
+  [[ $stage == /var/tmp/ubuntu-usb-stage.* && -d $stage && ! -L $stage ]] || return 1
+  usb_cleanup_mounts "$stage" || return
+  usb_stage_no_mounts "$stage" || return
+  rm -rf --one-file-system -- "$stage"
+}
+usb_stage_begin() {
+  local available
+  available=$(df -PB1 /var/tmp | awk 'NR==2 {print $4}') || return
+  [[ $available =~ ^[0-9]+$ ]] && ((available >= 8 * 1024 * 1024 * 1024)) || {
+    echo 'ERROR: need at least 8 GiB free builder storage in /var/tmp' >&2; return 1;
+  }
+  STAGE=$(mktemp -d /var/tmp/ubuntu-usb-stage.XXXXXXXX)
+  ROOT=$STAGE
+  USB_PROVISION_FROM_WRAPPER=1
+  echo "USB_STAGE_BEGIN: $STAGE (target not touched)"
+}
+usb_stage_finish() {
+  usb_cleanup_mounts "$STAGE" || return
+  usb_stage_no_mounts "$STAGE" || return
+  # Any unbound bootstrap archives reside in staging, not the persistent cache.
+  find "$STAGE/var/cache/apt/archives" -maxdepth 1 -type f -name '*.deb' -delete || return
+  USB_STAGE_VERIFIED=1
+  ROOT=''
+  echo 'USB_STAGE_VERIFIED: safe to proceed to target partitioning'
+}
+usb_copy_stage() {
+  local src=$1 dest=$2 differences
+  [[ ${USB_STAGE_VERIFIED:-0} == 1 ]] || return 1
+  usb_stage_no_mounts "$src" || return
+  mountpoint -q "$dest" || return
+  rsync -aHAXx --numeric-ids --exclude=/lost+found "$src/" "$dest/" || return
+  sync -f "$dest" || return
+  differences=$(rsync -aHAXx --numeric-ids --checksum --dry-run --itemize-changes \
+    --exclude=/lost+found "$src/" "$dest/") || return
+  if [[ -n $differences ]]; then
+    printf 'ERROR: target differs from staging root:\n%s\n' "$differences" >&2
+    return 1
+  fi
+  echo 'USB_STAGE_COPY_OK: root transfer verified by checksum and metadata comparison'
+}

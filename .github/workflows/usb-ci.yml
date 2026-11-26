@@ -59,7 +59,7 @@ jobs:
           REQUIRE_GPT_TEST=1 bash tests/static-check.sh
           sudo bash tests/safety-test.sh
           if command -v shellcheck >/dev/null; then
-            shellcheck -S error install.sh lib/provision.sh firstboot-complete.sh register-runner.sh tests/*.sh
+            shellcheck -S error install.sh lib/*.sh firstboot-complete.sh register-runner.sh tests/*.sh
           fi
   vga:
     needs: safety
@@ -95,7 +95,7 @@ jobs:
     env:
       USB_LOGIN_USER: ${{ inputs.login_user }}
       USB_RUNNER_USER: ${{ inputs.runner_user }}
-      USB_SKIP_FIRMWARE: ${{ inputs.include_firmware && '0' || '1' }}
+      USB_SKIP_FIRMWARE: ${{ (inputs.include_firmware || (github.event_name == 'push' && contains(github.event.head_commit.message, '[firmware-ci-once]'))) && '0' || '1' }}
       USB_CI_EXPLICIT: 'yes'
       USB_CI_KEEP_KEY: '1'
       USB_CI_VERIFY_ONBOARD: '1'
@@ -113,7 +113,7 @@ jobs:
       - name: Host dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends debootstrap gdisk parted dosfstools e2fsprogs qemu-system-x86 ovmf
+          sudo apt-get install -y --no-install-recommends debootstrap gdisk parted dosfstools e2fsprogs rsync qemu-system-x86 ovmf
       - name: Validate target Ubuntu package availability
         run: |
           while IFS= read -r package; do
@@ -133,7 +133,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.CACHE }}
-          key: noble-amd64-debs-v2-${{ env.USB_CI_MINIMAL }}-${{ hashFiles('config/packages.txt', 'config/packages-vga.txt') }}-${{ inputs.include_firmware && 'withfw' || 'nofw' }}
+          key: noble-amd64-debs-v2-${{ env.USB_CI_MINIMAL }}-${{ hashFiles('config/packages.txt', 'config/packages-vga.txt') }}-${{ env.USB_SKIP_FIRMWARE == '0' && 'withfw' || 'nofw' }}
       - name: Build and inspect isolated image
         id: imagebuild
         run: |
@@ -226,7 +226,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ env.CACHE }}
-          key: noble-amd64-debs-v2-${{ env.USB_CI_MINIMAL }}-${{ hashFiles('config/packages.txt', 'config/packages-vga.txt') }}-${{ inputs.include_firmware && 'withfw' || 'nofw' }}
+          key: noble-amd64-debs-v2-${{ env.USB_CI_MINIMAL }}-${{ hashFiles('config/packages.txt', 'config/packages-vga.txt') }}-${{ env.USB_SKIP_FIRMWARE == '0' && 'withfw' || 'nofw' }}
       - name: Upload boot and measurement logs (never upload disk image)
         if: always()
         uses: actions/upload-artifact@v4

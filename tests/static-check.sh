@@ -119,6 +119,9 @@ if bash "$here/install.sh" --hostname usb01 --device /dev/null --ssh-key /dev/nu
   echo 'ERROR: invalid device was accepted' >&2; exit 1
 fi
 bash -n "$here/lib/reliable-install.sh"
+bash -n "$here/lib/stage-packages.sh"
 bash -n "$here/tests/test-reliable-install.sh"
 bash "$here/tests/test-reliable-install.sh"
+# Ensure both entrypoints stage before any partitioning and provision only after transfer.
+python3 "$here/tests/test-stage-order.py"
 printf 'PASS: static and safety checks (no actual disk I/O)\n'

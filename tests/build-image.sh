@@ -15,18 +15,15 @@ source "$HERE/lib/reliable-install.sh"
 [[ $LOGIN_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ && $RUNNER_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || { echo 'invalid user names' >&2; exit 1; }
 [[ $LOGIN_USER != "$RUNNER_USER" && $LOGIN_USER != root && $RUNNER_USER != root ]] || { echo 'account collision' >&2; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
-DEV='' ROOT='' KEY=''
+DEV='' ROOT='' KEY='' STAGE='' USB_STAGE_VERIFIED=0
 cleanup() {
   local rc=$?
   trap - EXIT
-  if [[ -n $ROOT ]]; then
-    for d in var/cache/apt/archives run sys proc dev boot/efi; do
-      mountpoint -q "$ROOT/$d" && umount -R "$ROOT/$d" || :
-    done
-    mountpoint -q "$ROOT" && umount "$ROOT" || :
-    rmdir "$ROOT" 2>/dev/null || :
+  if [[ -n $ROOT && $ROOT != "$STAGE" ]]; then
+    usb_cleanup_mounts "$ROOT" || rc=1
   fi
-  [[ -z $DEV ]] || losetup -d "$DEV" || :
+  if [[ -n $STAGE ]]; then usb_drop_stage "$STAGE" || rc=1; fi
+  if [[ -n $DEV ]]; then losetup -d "$DEV" || rc=1; fi
   if [[ ${USB_CI_KEEP_KEY:-0} != 1 ]]; then
     [[ -z $KEY ]] || rm -f "$KEY" "${KEY%.pub}"
   fi
@@ -39,9 +36,15 @@ cleanup() {
   exit "$rc"
 }
 trap cleanup EXIT
-for tool in sgdisk wipefs partprobe udevadm mkfs.vfat mkfs.ext4 debootstrap losetup blkid chroot mount umount; do
+for tool in sgdisk wipefs partprobe udevadm mkfs.vfat mkfs.ext4 debootstrap losetup blkid chroot mount umount rsync; do
   command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
+usb_stage_begin
+source "$HERE/lib/stage-packages.sh"
+usb_stage_finish
+# Regression: no target image may exist until acquisition/installation succeeds.
+[[ ! -e $IMAGE ]] || die 'image created before stage completed'
+echo 'USB_CI_TARGET_UNTOUCHED_UNTIL_STAGE_OK'
 truncate -s 25G "$IMAGE"
 DEV=$(losetup --find --show --partscan "$IMAGE")
 [[ $DEV =~ ^/dev/loop[0-9]+$ ]] || { echo "Unexpected loop device $DEV" >&2; exit 1; }
@@ -55,6 +58,9 @@ mkfs.vfat -F32 -n UBUNTU_EFI "$ESP"
 mkfs.ext4 -F -L UBUNTU_ROOT "$ROOTPART"
 ROOT=$(mktemp -d "$RUNNER_TEMP/ubuntu-usb-root.XXXXXXXX")
 mount -o noatime "$ROOTPART" "$ROOT"
+usb_copy_stage "$STAGE" "$ROOT"
+usb_drop_stage "$STAGE"
+STAGE=''
 mkdir -p "$ROOT/boot/efi"
 mount "$ESP" "$ROOT/boot/efi"
 keybase="$RUNNER_TEMP/usb-ci-ssh-key"

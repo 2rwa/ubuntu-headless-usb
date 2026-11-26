@@ -9,7 +9,7 @@ USB_SKIP_FIRMWARE=0
 MIRROR='https://archive.ubuntu.com/ubuntu'
 USB_APT_CACHE_DIR=${USB_APT_CACHE_DIR:-/var/cache/ubuntu-headless-usb}
 source "$HERE/lib/reliable-install.sh"
-ROOT=''
+ROOT='' STAGE='' USB_STAGE_VERIFIED=0
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 usage() { cat <<'HELP'
 Ubuntu 24.04 minimal USB installer (amd64, no GUI)
@@ -17,6 +17,7 @@ Usage: sudo ./install.sh --device /dev/disk/by-id/usb-... --hostname usb01 \
   --ssh-key /home/USER/.ssh/id_ed25519.pub [--login-user USER] [--runner-user USER] [--login-uid 1000] [--runner-uid 1001] [--skip-firmware] [--apply]
 Default is read-only dry-run. --apply additionally requires an interactive, exact confirmation.
 APT archives are cached on the builder in /var/cache/ubuntu-headless-usb (override USB_APT_CACHE_DIR).
+All packages are installed into a staging root and verified before the USB is erased.
 HELP
 }
 while (($#)); do
@@ -76,7 +77,7 @@ printf 'by-id=%s\nhostname=%s\nusers: %s=%s %s=%s\nfirmware=%s\nSSH key=%s\nmode
   "$LINK" "$HOST" "$LOGIN_USER" "$LUID" "$RUNNER_USER" "$RUID" \
   "$([[ $USB_SKIP_FIRMWARE == 1 ]] && echo OMIT || echo INCLUDE)" "$KEY" "$([[ $APPLY == 1 ]] && echo APPLY || echo DRY-RUN)"
 printf 'APT cache on builder: %s\n' "$USB_APT_CACHE_DIR"
-for tool in sgdisk wipefs partprobe udevadm mkfs.vfat mkfs.ext4 debootstrap blkid mount umount openssl flock python3 findmnt; do
+for tool in sgdisk wipefs partprobe udevadm mkfs.vfat mkfs.ext4 debootstrap blkid mount umount openssl flock python3 findmnt rsync; do
   command -v "$tool" >/dev/null || die "missing prerequisite: $tool"
 done
 [[ -r /etc/ssl/certs/ca-certificates.crt && -x /usr/lib/apt/apt-helper ]] || die 'missing host CA certificates or apt-helper'
@@ -94,22 +95,35 @@ cache_mode=$(stat -c %a "$USB_APT_CACHE_DIR")
 (( (8#$cache_mode & 022) == 0 )) || die 'cache must not be group/world writable'
 cache_source=$(findmnt -n -o SOURCE -T "$USB_APT_CACHE_DIR")
 while IFS= read -r node; do
-  [[ $cache_source != "$node" && $cache_source != "$node["* ]] || die 'cache is on target disk'
+  [[ $cache_source != "$node" && $cache_source != "${node}["* ]] || die 'cache is on target disk'
 done < <(lsblk -nrpo PATH "$DEV")
 exec 9>"$USB_APT_CACHE_DIR/.install.lock"
 flock -n 9 || die 'another USB installation is using the cache'
 cleanup() {
   local rc=$?
   trap - EXIT
-  if ! usb_cleanup_mounts "$ROOT"; then
+  if [[ -n $ROOT && $ROOT != "$STAGE" ]] && ! usb_cleanup_mounts "$ROOT"; then
     echo "ERROR: cleanup incomplete; do not unplug USB ($ROOT)" >&2
+    ((rc != 0)) || rc=1
+  fi
+  if [[ -n $STAGE ]] && ! usb_drop_stage "$STAGE"; then
+    echo "ERROR: staging cleanup incomplete: $STAGE" >&2
     ((rc != 0)) || rc=1
   fi
   exit "$rc"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
+# No USB partition or filesystem changes before package preparation succeeds.
+stage_source=$(findmnt -n -o SOURCE -T /var/tmp)
+while IFS= read -r node; do
+  [[ $stage_source != "$node" && $stage_source != "${node}["* ]] || die 'staging storage is on target disk'
+done < <(lsblk -nrpo PATH "$DEV")
+usb_stage_begin
+source "$HERE/lib/stage-packages.sh"
+usb_stage_finish
 check_idle
+[[ $(lsblk -bdnro SIZE "$DEV") == "$SIZE" ]] || die 'target size changed'
 printf 'Creating GPT on %s\n' "$DEV"
 usb_partition_gpt "$DEV"
 partprobe "$DEV"; udevadm settle
@@ -120,6 +134,9 @@ mkfs.vfat -F32 -n UBUNTU_EFI "$ESP"
 mkfs.ext4 -F -L UBUNTU_ROOT "$ROOTPART"
 ROOT=$(mktemp -d /mnt/ubuntu-usb.XXXXXXXX)
 mount -o noatime "$ROOTPART" "$ROOT"
+usb_copy_stage "$STAGE" "$ROOT"
+usb_drop_stage "$STAGE"
+STAGE=''
 mkdir -p "$ROOT/boot/efi"
 mount "$ESP" "$ROOT/boot/efi"
 USB_PROVISION_FROM_WRAPPER=1

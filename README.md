@@ -33,7 +33,13 @@ sudo ./install.sh --device /dev/disk/by-id/usb-EXACT_ID \
 Physical installs now default to HTTPS, verify cached archives against SHA256
 from authenticated APT indexes, and keep downloads on the builder under
 `/var/cache/ubuntu-headless-usb` (override with `sudo env USB_APT_CACHE_DIR=/absolute/path ...`).
-The cache survives USB reformatting and subsequent invocations. APT acquisition
+The cache survives USB reformatting and subsequent invocations. A temporary root
+under `/var/tmp` is fully bootstrapped, downloaded, verified and package-installed
+**before any target partition writes**. At least 8 GiB free builder storage is
+required (plus cache usage). The root is copied using rsync preserving numeric
+ownership, hardlinks, ACLs and xattrs; a second checksum pass verifies the copy.
+Target-specific accounts, UUIDs and GRUB are then configured without APT access.
+APT acquisition
 is retried up to three rounds with refreshed indexes; package installation is
 attempted only after download and verification. dpkg errors are not blindly
 retried. A corrupt GPT is cleared and the new GPT verified after the usual
@@ -132,3 +138,5 @@ real-machine testing. The real PAM interaction *was* verified under QEMU.
 The physical USB install script installs the full package profile by default
 and retains the interactive disk-erase confirmation. The reliability regression
 also exercises a deliberately damaged GPT on a disposable regular file.
+The full-image CI supports an explicit `[firmware-ci-once]` alongside
+`[full-boot-ci-once]` to test the default physical package profile.
