@@ -9,6 +9,10 @@ USB_SKIP_FIRMWARE=0
 MIRROR='https://archive.ubuntu.com/ubuntu'
 USB_APT_CACHE_DIR=${USB_APT_CACHE_DIR:-/var/cache/ubuntu-headless-usb}
 source "$HERE/lib/reliable-install.sh"
+source "$HERE/lib/initial-auth.sh"
+set +x
+unset PASS
+PASS=''
 ROOT='' STAGE='' USB_STAGE_VERIFIED=0
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 usage() { cat <<'HELP'
@@ -18,6 +22,7 @@ Usage: sudo ./install.sh --device /dev/disk/by-id/usb-... --hostname usb01 \
 Default is read-only dry-run. --apply additionally requires an interactive, exact confirmation.
 APT archives are cached on the builder in /var/cache/ubuntu-headless-usb (override USB_APT_CACHE_DIR).
 All packages are installed into a staging root and verified before the USB is erased.
+With --apply, choose and confirm an initial password before the build starts.
 HELP
 }
 while (($#)); do
@@ -86,6 +91,7 @@ done
 printf 'Type EXACTLY: ERASE %s %s\n> ' "$HOST" "$DEV"
 IFS= read -r ack </dev/tty
 [[ $ack == "ERASE $HOST $DEV" ]] || die 'confirmation mismatch'
+usb_prompt_password </dev/tty >/dev/tty 2>/dev/tty || die 'initial password input cancelled'
 check_idle
 # Persistent cache must not be on the target or writable by a non-root user.
 [[ $USB_APT_CACHE_DIR == /* && ! -L $USB_APT_CACHE_DIR ]] || die 'cache must be an absolute non-symlink directory'
@@ -143,11 +149,12 @@ USB_PROVISION_FROM_WRAPPER=1
 source "$HERE/lib/provision.sh"
 sync
 if ! usb_cleanup_mounts "$ROOT"; then
-  printf 'Installation configured; initial password: %s\n' "$PASS" >&2
+  printf 'Installation configured; use the initial password entered at startup.\n' >&2
   die "unmount incomplete: $ROOT; do not unplug"
 fi
 ROOT=''
-printf '\nSUCCESS — WRITE DOWN ONE-TIME PASSWORD (NOT SAVED IN PLAINTEXT):\n'
-printf 'Hostname: %s  Login: %s  Password: %s\n' "$HOST" "$LOGIN_USER" "$PASS"
+unset PASS
+printf '\nSUCCESS — USE THE INITIAL PASSWORD ENTERED AT STARTUP\n'
+printf 'Hostname: %s  Login: %s\n' "$HOST" "$LOGIN_USER"
 printf 'First boot OFFLINE; login and change password, then run:\n  sudo usb-firstboot-complete\n'
 printf 'Only then will network, SSH and mDNS be enabled.\n'

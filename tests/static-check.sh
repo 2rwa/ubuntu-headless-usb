@@ -120,6 +120,8 @@ if bash "$here/install.sh" --hostname usb01 --device /dev/null --ssh-key /dev/nu
 fi
 bash -n "$here/lib/reliable-install.sh"
 bash -n "$here/lib/stage-packages.sh"
+bash -n "$here/lib/initial-auth.sh"
+bash "$here/tests/test-initial-auth.sh"
 bash -n "$here/tests/test-reliable-install.sh"
 bash "$here/tests/test-reliable-install.sh"
 # Ensure both entrypoints stage before any partitioning and provision only after transfer.

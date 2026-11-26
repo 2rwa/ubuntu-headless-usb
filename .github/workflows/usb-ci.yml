@@ -17,6 +17,11 @@ on:
         type: choice
         options: [static, vga, image, boot]
         default: static
+      builder_os:
+        description: 'Ubuntu version running the builder (target always 24.04)'
+        type: choice
+        options: [ubuntu-24.04, ubuntu-26.04]
+        default: ubuntu-26.04
       minimal_image:
         description: 'CI-only minimal Ubuntu profile (no developer packages)'
         type: boolean
@@ -90,9 +95,10 @@ jobs:
   image:
     needs: safety
     if: (github.event_name == 'workflow_dispatch' && (inputs.level == 'image' || inputs.level == 'boot')) || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[image-ci-once]') || (contains(github.event.head_commit.message, '[boot-ci-once]') || contains(github.event.head_commit.message, '[full-boot-ci-once]'))))
-    runs-on: ubuntu-24.04
+    runs-on: ${{ (github.event_name == 'workflow_dispatch' && inputs.builder_os) || (contains(github.event.head_commit.message, '[host26-ci-once]') && 'ubuntu-26.04') || 'ubuntu-24.04' }}
     timeout-minutes: 120
     env:
+      USB_CI_SLOW_LOGIN: ${{ ((github.event_name == 'workflow_dispatch' && inputs.builder_os == 'ubuntu-26.04') || contains(github.event.head_commit.message, '[host26-ci-once]')) && '1' || '0' }}
       USB_LOGIN_USER: ${{ inputs.login_user }}
       USB_RUNNER_USER: ${{ inputs.runner_user }}
       USB_SKIP_FIRMWARE: ${{ (inputs.include_firmware || (github.event_name == 'push' && contains(github.event.head_commit.message, '[firmware-ci-once]'))) && '0' || '1' }}
@@ -114,19 +120,18 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends debootstrap gdisk parted dosfstools e2fsprogs rsync qemu-system-x86 ovmf
-      - name: Validate target Ubuntu package availability
+      - name: Verify actual builder OS
         run: |
-          while IFS= read -r package; do
-            [[ "$package" =~ ^[a-z0-9][a-z0-9+.-]*$ ]] || continue
-            [[ "$package" == linux-firmware && "$USB_SKIP_FIRMWARE" == 1 ]] && continue
-            apt-cache show "$package" >/dev/null || { echo "Missing package: $package" >&2; exit 1; }
-          done < config/packages.txt
-          if [[ "$USB_CI_MINIMAL" == 1 ]]; then
-            while IFS= read -r package; do
-              [[ "$package" =~ ^[a-z0-9][a-z0-9+.-]*$ ]] || continue
-              apt-cache show "$package" >/dev/null || { echo "Missing minimal package: $package" >&2; exit 1; }
-            done < config/packages-vga.txt
+          cat /etc/os-release
+          uname -r
+          . /etc/os-release
+          if [[ "$USB_CI_SLOW_LOGIN" == 1 ]]; then
+            [[ "$VERSION_ID" == 26.04 ]]
+          else
+            [[ "$VERSION_ID" == 24.04 ]]
           fi
+          echo "Verified builder Ubuntu $VERSION_ID; target Ubuntu 24.04"
+          # Target packages are resolved by noble APT, not by host apt-cache.
       - name: Restore cached .deb packages (optional)
         id: aptcache
         if: env.CACHE_ENABLED == 'true'
@@ -177,16 +182,16 @@ jobs:
           # Suppress the derived public key; never log private material.
           ssh-keygen -y -f "$key" >/dev/null
           echo 'PASS: unprivileged runner can read CI SSH key (0600)'
-      - name: BIOS boot (live serial, 180s hard limit)
+      - name: BIOS boot (live serial, 300s hard limit)
         id: biosboot
         if: (github.event_name == 'workflow_dispatch' && inputs.level == 'boot') || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[boot-ci-once]') || contains(github.event.head_commit.message, '[full-boot-ci-once]')))
         run: |
-          if timeout --signal=TERM --kill-after=10s 180s bash tests/qemu-boot.sh bios "$IMAGE" "${{ runner.temp }}/qemu-bios.log"; then
-            echo "PASS: BIOS QEMU integration completed within 180s"
+          if timeout --signal=TERM --kill-after=10s 300s bash tests/qemu-boot.sh bios "$IMAGE" "${{ runner.temp }}/qemu-bios.log"; then
+            echo "PASS: BIOS QEMU integration completed within 300s"
           else
             rc=$?
             if (( rc == 124 )); then
-              echo "FAIL: BIOS QEMU integration exceeded 180s total; full ttyS0 log retained" >&2
+              echo "FAIL: BIOS QEMU integration exceeded 300s total; full ttyS0 log retained" >&2
               tail -n 30 "${{ runner.temp }}/qemu-bios.log" >&2 || :
             fi
             exit "$rc"

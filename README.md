@@ -47,8 +47,12 @@ interactive ERASE confirmation. Cleanup retries unmounts and reports busy
 mounts; no lazy unmount or process killing. The installer still creates a fresh
 filesystem on each --apply; resuming a partially installed root is not supported.
 
-Initial password is generated only after installation, printed once, and forced
-to change at first local login. After changing it, run
+With `--apply`, choose and confirm an initial password (8–64 printable ASCII
+characters, no spaces) before staging begins. Input is hidden, not passed as
+a CLI argument, not saved in plaintext and not printed at completion.
+A target-side crypt check verifies the generated shadow hash and forced-change
+state. The local login timeout is 180 seconds instead of 60 seconds.
+The initial password must still be changed at first local login. After changing it, run
 `sudo usb-firstboot-complete` locally. Then SSH public-key login,
 `hostname.local` and networking become available. Runner registration is
 interactive using `sudo usb-register-runner --url https://github.com/OWNER/REPO`.
@@ -140,3 +144,13 @@ and retains the interactive disk-erase confirmation. The reliability regression
 also exercises a deliberately damaged GPT on a disposable regular file.
 The full-image CI supports an explicit `[firmware-ci-once]` alongside
 `[full-boot-ci-once]` to test the default physical package profile.
+
+## Cross-version builder test
+
+The image/boot job accepts `builder_os=ubuntu-26.04` or `ubuntu-24.04`.
+The target is always Ubuntu 24.04 (noble); package availability is checked in
+that target, never against the host release. A push containing
+`[host26-ci-once] [full-boot-ci-once] [firmware-ci-once]` triggers a full
+Ubuntu 26.04 host build with firmware, then BIOS and UEFI tests. The BIOS test
+waits 65 seconds after entering the user name before entering the initial
+password to exercise the extended local login timeout. No physical USB writes.

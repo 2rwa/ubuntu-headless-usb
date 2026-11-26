@@ -16,9 +16,13 @@ echo 'LANG=en_US.UTF-8' > "$ROOT/etc/default/locale"
 chroot "$ROOT" useradd -m -u "$LUID" -s /bin/bash -G sudo "$LOGIN_USER"
 chroot "$ROOT" useradd -m -u "$RUID" -s /usr/sbin/nologin "$RUNNER_USER"
 chroot "$ROOT" passwd -l "$RUNNER_USER"
-PASS=$(openssl rand -hex 12)
+usb_password_valid "${PASS:-}" || { echo 'Missing or invalid initial password' >&2; exit 1; }
 printf '%s:%s\n' "$LOGIN_USER" "$PASS" | chroot "$ROOT" chpasswd
 chroot "$ROOT" chage -d 0 "$LOGIN_USER"
+usb_verify_password || { echo 'ERROR: target shadow password verification failed' >&2; exit 1; }
+echo 'PASS: target crypt verifies initial password and forced change'
+usb_set_login_timeout "$ROOT/etc/login.defs"
+echo 'Console login timeout: 180 seconds'
 mkdir -p "$ROOT/home/$LOGIN_USER/.ssh"
 install -m 600 "$KEY" "$ROOT/home/$LOGIN_USER/.ssh/authorized_keys"
 chmod 700 "$ROOT/home/$LOGIN_USER/.ssh"

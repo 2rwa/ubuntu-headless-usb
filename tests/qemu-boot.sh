@@ -148,6 +148,10 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     # Capture only after the username, before typing any secret.
     # Later password-stage screens are deliberately never uploaded.
     python3 tests/qemu-vga.py capture "$monitor" "${RUNNER_TEMP:?}/qemu-$mode-vga-username.png"
+    if [[ ${USB_CI_SLOW_LOGIN:-0} == 1 ]]; then
+      echo 'Testing console login with 65-second delay before password'
+      sleep 65
+    fi
     python3 tests/qemu-vga.py type-file "$monitor" "$initial"
     sleep 3
     python3 tests/qemu-vga.py type-file "$monitor" "$initial"
@@ -171,7 +175,7 @@ if [[ ${USB_CI_VERIFY_ONBOARD:-0} == 1 ]]; then
     # and whether it returned successfully; journal diagnostics report why.
     wait_marker USB_CI_FIRSTBOOT_BEGIN 20
     # Under TCG the five systemctl transitions vary by >20s between runs.
-    # Retain the overall 180s cap; stage timings identify real stalls.
+    # Retain the workflow's overall cap; stage timings identify real stalls.
     wait_marker USB_CI_FIRSTBOOT_OK 55
     echo 'PASS: sudo firstboot actually started and completed'
     # SSH verifies that the service start and network unmask succeeded.

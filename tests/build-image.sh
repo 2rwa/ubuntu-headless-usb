@@ -12,6 +12,12 @@ LUID=1000 RUID=1001 USB_SKIP_FIRMWARE=${USB_SKIP_FIRMWARE:-1} USB_CI_SERIAL=1
 USB_CI_MINIMAL=${USB_CI_MINIMAL:-0}
 MIRROR='https://archive.ubuntu.com/ubuntu'
 source "$HERE/lib/reliable-install.sh"
+source "$HERE/lib/initial-auth.sh"
+set +x
+unset PASS
+# CI-only password, never printed. Exercise the shortest supported length.
+PASS=$(openssl rand -hex 4)
+die() { echo "ERROR: $*" >&2; exit 1; }
 [[ $LOGIN_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ && $RUNNER_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || { echo 'invalid user names' >&2; exit 1; }
 [[ $LOGIN_USER != "$RUNNER_USER" && $LOGIN_USER != root && $RUNNER_USER != root ]] || { echo 'account collision' >&2; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
@@ -92,6 +98,7 @@ if [[ ${USB_CI_VGA_LOGIN:-0} == 1 ]]; then
   chmod 600 "$passfile"
   chown "$(stat -c %u "$RUNNER_TEMP")":"$(stat -c %g "$RUNNER_TEMP")" "$passfile"
 fi
+unset PASS
 bash "$HERE/tests/inspect-root.sh" "$ROOT" "$LOGIN_USER" "$RUNNER_USER" "$LUID" "$RUID" "$ROOTPART" "$ESP"
 sync
 echo "PASS: provisioned and inspected $IMAGE"

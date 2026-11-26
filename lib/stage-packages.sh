@@ -10,6 +10,8 @@ if [[ -n ${USB_APT_CACHE_DIR:-} ]]; then
 fi
 debootstrap "${DEBOOTSTRAP_ARGS[@]}" noble "$ROOT" "$MIRROR"
 chmod 0755 "$ROOT"
+[[ $(chroot "$ROOT" sh -c '. /etc/os-release; printf "%s" "$VERSION_ID"') == 24.04 ]] || die 'unexpected target OS'
+echo 'Verified target Ubuntu 24.04'
 cat > "$ROOT/etc/apt/sources.list" <<EOF
 deb $MIRROR noble main restricted universe multiverse
 deb $MIRROR noble-updates main restricted universe multiverse
