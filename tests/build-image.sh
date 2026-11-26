@@ -10,7 +10,8 @@ IMAGE=${1:-}
 HOST=usb-ci-01 LOGIN_USER=${USB_LOGIN_USER:-developer} RUNNER_USER=${USB_RUNNER_USER:-buildbot}
 LUID=1000 RUID=1001 USB_SKIP_FIRMWARE=${USB_SKIP_FIRMWARE:-1} USB_CI_SERIAL=1
 USB_CI_MINIMAL=${USB_CI_MINIMAL:-0}
-MIRROR='http://archive.ubuntu.com/ubuntu'
+MIRROR='https://archive.ubuntu.com/ubuntu'
+source "$HERE/lib/reliable-install.sh"
 [[ $LOGIN_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ && $RUNNER_USER =~ ^[a-z_][a-z0-9_-]{0,30}$ ]] || { echo 'invalid user names' >&2; exit 1; }
 [[ $LOGIN_USER != "$RUNNER_USER" && $LOGIN_USER != root && $RUNNER_USER != root ]] || { echo 'account collision' >&2; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
@@ -38,17 +39,14 @@ cleanup() {
   exit "$rc"
 }
 trap cleanup EXIT
-for tool in sgdisk partprobe udevadm mkfs.vfat mkfs.ext4 debootstrap losetup blkid chroot mount umount; do
+for tool in sgdisk wipefs partprobe udevadm mkfs.vfat mkfs.ext4 debootstrap losetup blkid chroot mount umount; do
   command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
 truncate -s 25G "$IMAGE"
 DEV=$(losetup --find --show --partscan "$IMAGE")
 [[ $DEV =~ ^/dev/loop[0-9]+$ ]] || { echo "Unexpected loop device $DEV" >&2; exit 1; }
 echo "CI test image: $IMAGE, device $DEV; firmware excluded=$USB_SKIP_FIRMWARE"
-sgdisk --zap-all "$DEV"
-sgdisk --clear --new=1:1MiB:+2MiB --typecode=1:EF02 --change-name=1:BIOS_BOOT \
-  --new=2:0:+512MiB --typecode=2:EF00 --change-name=2:EFI \
-  --new=3:0:0 --typecode=3:8300 --change-name=3:UBUNTU "$DEV"
+usb_partition_gpt "$DEV"
 partprobe "$DEV"
 udevadm settle
 ESP="${DEV}p2" ROOTPART="${DEV}p3"

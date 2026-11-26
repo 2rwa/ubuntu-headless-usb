@@ -30,6 +30,17 @@ sudo ./install.sh --device /dev/disk/by-id/usb-EXACT_ID \
 # Inspect output and only then repeat with --apply, confirming on a real TTY.
 ```
 
+Physical installs now default to HTTPS, verify cached archives against SHA256
+from authenticated APT indexes, and keep downloads on the builder under
+`/var/cache/ubuntu-headless-usb` (override with `sudo env USB_APT_CACHE_DIR=/absolute/path ...`).
+The cache survives USB reformatting and subsequent invocations. APT acquisition
+is retried up to three rounds with refreshed indexes; package installation is
+attempted only after download and verification. dpkg errors are not blindly
+retried. A corrupt GPT is cleared and the new GPT verified after the usual
+interactive ERASE confirmation. Cleanup retries unmounts and reports busy
+mounts; no lazy unmount or process killing. The installer still creates a fresh
+filesystem on each --apply; resuming a partially installed root is not supported.
+
 Initial password is generated only after installation, printed once, and forced
 to change at first local login. After changing it, run
 `sudo usb-firstboot-complete` locally. Then SSH public-key login,
@@ -118,5 +129,6 @@ real-machine testing. The real PAM interaction *was* verified under QEMU.
   cache population itself consumes upload bandwidth; use VGA smoke while
   debugging only QEMU display or keyboard transport.
 
-The real physical USB install script is unchanged: it always installs the full
-package profile and retains the interactive disk-erase confirmation.
+The physical USB install script installs the full package profile by default
+and retains the interactive disk-erase confirmation. The reliability regression
+also exercises a deliberately damaged GPT on a disposable regular file.

@@ -118,4 +118,7 @@ grep -q 'sha256sum -c -' "$here/register-runner.sh"
 if bash "$here/install.sh" --hostname usb01 --device /dev/null --ssh-key /dev/null --apply >/dev/null 2>&1; then
   echo 'ERROR: invalid device was accepted' >&2; exit 1
 fi
+bash -n "$here/lib/reliable-install.sh"
+bash -n "$here/tests/test-reliable-install.sh"
+bash "$here/tests/test-reliable-install.sh"
 printf 'PASS: static and safety checks (no actual disk I/O)\n'

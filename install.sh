@@ -6,7 +6,9 @@ export DEBIAN_FRONTEND=noninteractive
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 HOST='' LINK='' KEY='' APPLY=0 LOGIN_USER=koyama RUNNER_USER=runner LUID=1000 RUID=1001
 USB_SKIP_FIRMWARE=0
-MIRROR='http://archive.ubuntu.com/ubuntu'
+MIRROR='https://archive.ubuntu.com/ubuntu'
+USB_APT_CACHE_DIR=${USB_APT_CACHE_DIR:-/var/cache/ubuntu-headless-usb}
+source "$HERE/lib/reliable-install.sh"
 ROOT=''
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 usage() { cat <<'HELP'
@@ -14,6 +16,7 @@ Ubuntu 24.04 minimal USB installer (amd64, no GUI)
 Usage: sudo ./install.sh --device /dev/disk/by-id/usb-... --hostname usb01 \
   --ssh-key /home/USER/.ssh/id_ed25519.pub [--login-user USER] [--runner-user USER] [--login-uid 1000] [--runner-uid 1001] [--skip-firmware] [--apply]
 Default is read-only dry-run. --apply additionally requires an interactive, exact confirmation.
+APT archives are cached on the builder in /var/cache/ubuntu-headless-usb (override USB_APT_CACHE_DIR).
 HELP
 }
 while (($#)); do
@@ -49,7 +52,7 @@ SIZE=$(lsblk -bdnro SIZE "$DEV")
 ((SIZE >= 24 * 1024 * 1024 * 1024)) || die 'need at least 24 GiB'
 [[ -r $KEY && -f $KEY ]] || die 'pass a readable SSH public key via --ssh-key'
 ssh-keygen -lf "$KEY" >/dev/null || die 'invalid SSH public key'
-[[ -f $HERE/config/packages.txt && -f $HERE/firstboot-complete.sh && -f $HERE/register-runner.sh ]] || die 'companion files missing'
+[[ -f $HERE/config/packages.txt && -f $HERE/firstboot-complete.sh && -f $HERE/register-runner.sh && -f $HERE/lib/provision.sh && -f $HERE/lib/verify-apt-cache.py ]] || die 'companion files missing'
 [[ $MIRROR =~ ^https?://[a-zA-Z0-9._:/-]+$ ]] || die 'invalid mirror URL'
 check_idle() {
   [[ $(readlink -f -- "$LINK") == "$DEV" ]] || die 'USB target changed'
@@ -72,31 +75,43 @@ lsblk -dn -o PATH,MODEL,SERIAL,TRAN,SIZE "$DEV"
 printf 'by-id=%s\nhostname=%s\nusers: %s=%s %s=%s\nfirmware=%s\nSSH key=%s\nmode=%s\n\n' \
   "$LINK" "$HOST" "$LOGIN_USER" "$LUID" "$RUNNER_USER" "$RUID" \
   "$([[ $USB_SKIP_FIRMWARE == 1 ]] && echo OMIT || echo INCLUDE)" "$KEY" "$([[ $APPLY == 1 ]] && echo APPLY || echo DRY-RUN)"
-((APPLY == 1)) || { echo 'Dry-run complete. No changes.'; exit 0; }
-[[ -t 0 && -t 1 ]] || die '--apply requires an interactive terminal, not Actions'
-for tool in sgdisk partprobe udevadm mkfs.vfat mkfs.ext4 debootstrap blkid mount umount openssl; do
+printf 'APT cache on builder: %s\n' "$USB_APT_CACHE_DIR"
+for tool in sgdisk wipefs partprobe udevadm mkfs.vfat mkfs.ext4 debootstrap blkid mount umount openssl flock python3 findmnt; do
   command -v "$tool" >/dev/null || die "missing prerequisite: $tool"
 done
+[[ -r /etc/ssl/certs/ca-certificates.crt && -x /usr/lib/apt/apt-helper ]] || die 'missing host CA certificates or apt-helper'
+((APPLY == 1)) || { echo 'Dry-run complete. No changes.'; exit 0; }
+[[ -t 0 && -t 1 ]] || die '--apply requires an interactive terminal, not Actions'
 printf 'Type EXACTLY: ERASE %s %s\n> ' "$HOST" "$DEV"
 IFS= read -r ack </dev/tty
 [[ $ack == "ERASE $HOST $DEV" ]] || die 'confirmation mismatch'
 check_idle
+# Persistent cache must not be on the target or writable by a non-root user.
+[[ $USB_APT_CACHE_DIR == /* && ! -L $USB_APT_CACHE_DIR ]] || die 'cache must be an absolute non-symlink directory'
+mkdir -p -m 0755 "$USB_APT_CACHE_DIR"
+[[ $(stat -c %u "$USB_APT_CACHE_DIR") == 0 ]] || die 'cache must be root owned'
+cache_mode=$(stat -c %a "$USB_APT_CACHE_DIR")
+(( (8#$cache_mode & 022) == 0 )) || die 'cache must not be group/world writable'
+cache_source=$(findmnt -n -o SOURCE -T "$USB_APT_CACHE_DIR")
+while IFS= read -r node; do
+  [[ $cache_source != "$node" && $cache_source != "$node["* ]] || die 'cache is on target disk'
+done < <(lsblk -nrpo PATH "$DEV")
+exec 9>"$USB_APT_CACHE_DIR/.install.lock"
+flock -n 9 || die 'another USB installation is using the cache'
 cleanup() {
-  [[ -n $ROOT ]] || return 0
-  local dir
-  for dir in var/cache/apt/archives run sys proc dev boot/efi; do
-    mountpoint -q "$ROOT/$dir" && umount -R "$ROOT/$dir" || :
-  done
-  mountpoint -q "$ROOT" && umount "$ROOT" || :
-  rmdir "$ROOT" 2>/dev/null || :
+  local rc=$?
+  trap - EXIT
+  if ! usb_cleanup_mounts "$ROOT"; then
+    echo "ERROR: cleanup incomplete; do not unplug USB ($ROOT)" >&2
+    ((rc != 0)) || rc=1
+  fi
+  exit "$rc"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
+check_idle
 printf 'Creating GPT on %s\n' "$DEV"
-sgdisk --zap-all "$DEV"
-sgdisk --clear --new=1:1MiB:+2MiB --typecode=1:EF02 --change-name=1:BIOS_BOOT \
-  --new=2:0:+512MiB --typecode=2:EF00 --change-name=2:EFI \
-  --new=3:0:0 --typecode=3:8300 --change-name=3:UBUNTU "$DEV"
+usb_partition_gpt "$DEV"
 partprobe "$DEV"; udevadm settle
 if [[ $DEV =~ [0-9]$ ]]; then SEP=p; else SEP=''; fi
 ESP="$DEV$SEP"2; ROOTPART="$DEV$SEP"3
@@ -110,6 +125,11 @@ mount "$ESP" "$ROOT/boot/efi"
 USB_PROVISION_FROM_WRAPPER=1
 source "$HERE/lib/provision.sh"
 sync
+if ! usb_cleanup_mounts "$ROOT"; then
+  printf 'Installation configured; initial password: %s\n' "$PASS" >&2
+  die "unmount incomplete: $ROOT; do not unplug"
+fi
+ROOT=''
 printf '\nSUCCESS — WRITE DOWN ONE-TIME PASSWORD (NOT SAVED IN PLAINTEXT):\n'
 printf 'Hostname: %s  Login: %s  Password: %s\n' "$HOST" "$LOGIN_USER" "$PASS"
 printf 'First boot OFFLINE; login and change password, then run:\n  sudo usb-firstboot-complete\n'
